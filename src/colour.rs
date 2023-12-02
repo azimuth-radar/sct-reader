@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use crate::error::Error;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Colour {
     pub r: u8,
     pub g: u8,
