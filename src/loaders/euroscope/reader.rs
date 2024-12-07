@@ -5,7 +5,7 @@ use std::{
     time::Instant,
 };
 
-use crate::{
+use super::{
     colour::Colour,
     error::Error,
     partial::{ArtccOrAirwayLineType, BeaconType, PartialSector, SidStarType},

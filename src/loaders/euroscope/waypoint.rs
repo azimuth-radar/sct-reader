@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::{
+use super::{
     position::{Heading, Position, Valid},
     AirspaceClass,
 };

@@ -1,4 +1,5 @@
-use crate::{error::Error, position, SectorResult};
+use crate::loaders::euroscope::{error::Error, position, SectorResult};
+
 
 #[derive(Debug, Clone, Default)]
 pub struct PartialSectorInfo {

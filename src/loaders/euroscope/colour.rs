@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use crate::error::Error;
+use super::error::Error;
 
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Colour {

@@ -1,6 +1,6 @@
 use std::{collections::HashMap, str::FromStr};
 
-use crate::{
+use super::{
     colour::Colour,
     error::Error,
     line::{ColouredLine, LineGroup},
