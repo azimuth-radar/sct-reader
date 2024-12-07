@@ -12,6 +12,8 @@ pub mod waypoint;
 pub mod symbology;
 mod loader;
 pub use loader::EuroScopeLoader;
+mod asr;
+pub use asr::EsAsr;
 
 pub type SectorResult<T> = std::result::Result<T, error::Error>;
 

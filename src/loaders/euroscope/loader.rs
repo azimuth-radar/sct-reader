@@ -3,7 +3,7 @@ use std::{collections::HashMap, fs::File, io::{BufRead, BufReader}, path::{Path,
 use anyhow::Context;
 use directories::UserDirs;
 
-use super::{colour::Colour, reader::SctReader, sector::Sector, symbology::{SymbologyAttribute, SymbologyInfo, SymbologyItem}};
+use super::{colour::Colour, reader::SctReader, sector::Sector, symbology::{SymbologyAttribute, SymbologyInfo, SymbologyItem}, EsAsr};
 
 #[derive(Debug)]
 pub struct EuroScopeLoader {
@@ -11,8 +11,9 @@ pub struct EuroScopeLoader {
     pub symbology_file: String,
     pub sector_file: String,
     pub asr_files: Vec<(String, String)>,
-    pub sector: Option<Sector>,
-    pub symbology: Option<SymbologyInfo>
+    pub sectors: HashMap<String, Sector>,
+    pub symbology: Option<SymbologyInfo>,
+    pub asrs: HashMap<String, EsAsr>
 }
 
 impl EuroScopeLoader {
@@ -29,11 +30,11 @@ impl EuroScopeLoader {
             if let Ok(ln) = line {
                 let items = ln.split("\t").collect::<Vec<&str>>();
                 if items.len() > 0 {
-                    match items[0] {
-                        "Settings" => {
+                    match items[0].to_lowercase().as_str() {
+                        "settings" => {
                             if items.len() >= 3 {
-                                match items[1] {
-                                    "SettingsfileSYMBOLOGY" => {
+                                match items[1].to_lowercase().as_str() {
+                                    "settingsfilesymbology" => {
                                         symbology_file =
                                             Self::try_convert_es_path(&prf_file, items[2])?
                                                 .canonicalize()?
@@ -53,7 +54,7 @@ impl EuroScopeLoader {
                                 }
                             }
                         }
-                        "ASRFastKeys" => asrs.push((
+                        "asrfastkeys" => asrs.push((
                             items[1].to_owned(),
                             Self::try_convert_es_path(&prf_file, items[2])?
                                 .canonicalize()?
@@ -77,7 +78,8 @@ impl EuroScopeLoader {
             symbology_file: symbology_file.to_string(),
             sector_file: sector_file.to_string(),
             asr_files: asrs,
-            sector: None,
+            sectors: HashMap::new(),
+            asrs: HashMap::new(),
             symbology: None
         })
     }
@@ -86,10 +88,27 @@ impl EuroScopeLoader {
         // Load symbology
         self.symbology = Some(SymbologyInfo::try_from_file(&self.symbology_file)?);
 
-        // Load Sector File
+        // Load Main Sector File
         let sct_reader = SctReader::new(BufReader::new(File::open(&self.sector_file)?));
         let sct_result = sct_reader.try_read()?;
-        self.sector = Some(sct_result);
+        self.sectors.insert(self.sector_file.to_string(), sct_result);
+
+        // Load ASRs
+        for asr_source in &self.asr_files {
+            let mut asr = EsAsr::try_from_asr_file(&asr_source.1)?;
+            let asr_sector_path = Self::try_convert_es_path(&self.prf_file, &asr.1)?.canonicalize()?.to_str().unwrap().to_owned();
+
+            if !self.sectors.contains_key(&asr_sector_path) {
+                let asr_sct_reader = SctReader::new(BufReader::new(File::open(&asr_sector_path)?));
+                let asr_sct_result = asr_sct_reader.try_read()?;
+                self.sectors.insert(asr_sector_path.to_string(), asr_sct_result);
+            }
+
+            asr.0.sector_file_id = Some(asr_sector_path.to_string());
+            asr.0.name = Path::new(&asr_source.1).file_stem().unwrap_or_default().to_str().unwrap().to_string();
+
+            self.asrs.insert(asr_source.0.to_string(), asr.0);
+        }
 
         Ok(())
     }

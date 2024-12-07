@@ -28,9 +28,10 @@ pub enum SymbologyItemType {
     GroundNetwork
 }
 
-impl From<&str> for SymbologyItemType {
-    fn from(value: &str) -> Self {
-        match value.to_lowercase().as_str() {
+impl TryFrom<&str> for SymbologyItemType {
+    type Error = ();
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        Ok(match value.to_lowercase().as_str() {
             "airports" => Self::Airports,
             "low airways" => Self::LowAirways,
             "high airways" => Self::HighAirways,
@@ -51,8 +52,9 @@ impl From<&str> for SymbologyItemType {
             "chat" => Self::Chat,
             "ground network" => Self::GroundNetwork,
             "sector" => Self::Sector,
-            &_ => Self::Other
-        }
+            "other" => Self::Other,
+            &_ => return Err(())
+        })
     }
 }
 
@@ -89,32 +91,29 @@ impl SymbologyInfo {
                 let items = line_str.split(":").collect::<Vec<&str>>();
 
                 if items.len() > 0 {
-                    match items[0] {
-                        "m_ClipArea" => clip_area = items[1].parse()?,
-                        "SYMBOLOGY" => {},
-                        "SYMBOLSIZE" => {},
-                        "SYMBOL" => {},
-                        "SYMBOLITEM" => {},
-                        "END" => {},
+                    match items[0].to_lowercase().as_str() {
+                        "m_cliparea" => clip_area = items[1].parse()?,
                         &_ => {
-                            // Create Symbol Def
-                            let symbol_def = SymbologyAttribute {
-                                attribute: items[1].to_string(),
-                                color: Colour::from(items[2].parse::<u32>()?),
-                                size: items[3].parse()?,
-                                line_weight: items[4].parse()?,
-                                line_style: items[5].parse()?,
-                                text_align: items[6].parse()?
-                            };
+                            if let Ok(symbol_type) = items[0].try_into() {
+                                // Create Symbol Def
+                                let symbol_def = SymbologyAttribute {
+                                    attribute: items[1].to_string(),
+                                    color: Colour::from(items[2].parse::<u32>()?),
+                                    size: items[3].parse()?,
+                                    line_weight: items[4].parse()?,
+                                    line_style: items[5].parse()?,
+                                    text_align: items[6].parse()?
+                                };
 
-                            // Update/Push into map
-                            if let Some(symbol_item) = symbols.get_mut(items[0]) {
-                                symbol_item.defs.push(symbol_def);
-                            } else {
-                                symbols.insert(items[0].to_string(), SymbologyItem {
-                                    item_type: items[0].into(),
-                                    defs: vec![symbol_def]
-                                });
+                                // Update/Push into map
+                                if let Some(symbol_item) = symbols.get_mut(items[0]) {
+                                    symbol_item.defs.push(symbol_def);
+                                } else {
+                                    symbols.insert(items[0].to_string(), SymbologyItem {
+                                        item_type: symbol_type,
+                                        defs: vec![symbol_def]
+                                    });
+                                }
                             }
                         }
                     }
