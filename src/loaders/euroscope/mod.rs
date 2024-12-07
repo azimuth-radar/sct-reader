@@ -9,6 +9,7 @@ pub mod position;
 pub mod reader;
 pub mod sector;
 pub mod waypoint;
+pub mod symbology;
 mod loader;
 pub use loader::EuroScopeLoader;
 
