@@ -148,6 +148,7 @@ fn parse_file_section(value: &str) -> SectorResult<FileSection> {
 }
 
 #[test]
+#[ignore]
 fn test() {
     let file =
         File::open(r#"C:\Users\chpme\AppData\Roaming\EuroScope\UK\Data\Sector\UK_2023_11.sct"#)

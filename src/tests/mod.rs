@@ -25,6 +25,7 @@ fn test_convert_es_path_2(){
 }
 
 #[test]
+#[ignore]
 fn test_load_es_1(){
     let prf_path = "/Users/pshivaraman/Documents/EuroScope/UK/Belfast/Belfast Combined.prf";
     let mut es = EuroScopeLoader::try_new_from_prf(prf_path).unwrap();
