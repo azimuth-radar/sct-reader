@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{fs::File, io::BufReader, str::FromStr};
 
 use error::Error;
 pub mod colour;

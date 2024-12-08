@@ -34,7 +34,7 @@ pub struct PartialSector {
     pub sid_entries: Vec<LineGroup<ColouredLine>>,
     pub star_entries: Vec<LineGroup<ColouredLine>>,
     pub geo_entries: Vec<LineGroup<ColouredLine>>,
-    pub regions: Vec<PartialRegionGroup>,
+    pub region_groups: Vec<PartialRegionGroup>,
     pub labels: Vec<LabelGroup>,
 
     current_region_name: String,
@@ -448,6 +448,7 @@ impl PartialSector {
     pub fn parse_region_line(&mut self, value: &str) -> SectorResult<()> {
         let mut sections = value.split_whitespace().collect::<Vec<_>>();
         if sections.len() < 2 {
+            println!("1");
             return Err(Error::InvalidRegion);
         }
 
@@ -456,26 +457,35 @@ impl PartialSector {
             // We set the current region name
             let name = sections[1..].join(" ");
             self.current_region_name = name.clone();
+            println!("2");
             return Ok(());
         }
         // If a colour is defined, this is a new region. We see if any with the same name already exist, otherwise create it.
         else if sections.len() == 3 {
+            println!("3");
             let colour = self
                 .try_fetch_or_decode_colour(sections[0])
                 .ok_or(Error::InvalidRegion)?;
             if let Some(region_group) = self
-                .regions
+                .region_groups
                 .iter_mut()
                 .find(|region_group| region_group.name == self.current_region_name)
             {
+                println!("4");
                 region_group.regions.push(PartialRegion {
                     colour: Some(colour),
                     vertices: vec![],
                 });
             } else {
-                self.regions.push(PartialRegionGroup {
+                println!("5");
+                self.region_groups.push(PartialRegionGroup {
                     name: self.current_region_name.clone(),
-                    regions: vec![],
+                    regions: vec![
+                        PartialRegion {
+                            colour: Some(colour),
+                            vertices: vec![],
+                        }
+                    ],
                 });
             }
         }
@@ -486,7 +496,8 @@ impl PartialSector {
             .map(|pos| pos.validate().ok())
             .flatten()
         {
-            self.regions
+            println!("6");
+            self.region_groups
                 .iter_mut()
                 .find(|region_group| region_group.name == self.current_region_name)
                 .ok_or(Error::InvalidRegion)?

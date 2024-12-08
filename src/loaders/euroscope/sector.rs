@@ -40,7 +40,7 @@ impl TryFrom<PartialSector> for Sector {
     fn try_from(value: PartialSector) -> Result<Self, Self::Error> {
         let sector_info = SectorInfo::try_from(value.sector_info)?;
         let regions = value
-            .regions
+            .region_groups
             .into_iter()
             .map(|region_group| RegionGroup::try_from(region_group))
             .collect::<Result<Vec<RegionGroup>, Error>>()?;
