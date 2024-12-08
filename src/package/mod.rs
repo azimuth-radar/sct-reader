@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use aviation_calc_util::{geo::{Bearing, GeoPoint}, units::{Angle, Length}};
-use display::{AtcDisplay, DisplayDefaultConfig};
+use display::{AtcDisplay, DisplayDefaultConfig, LineStyle};
 use geojson::{Feature, FeatureCollection, GeoJson, Geometry, Value};
 use map::AtcMap;
 use serde::{Deserialize, Serialize};
@@ -105,25 +105,25 @@ impl TryFrom<EuroScopeResult> for AtcScopePackage {
 
             // Airports
             for entry in sector.1.airports {
-                let val = AtcMapSymbol::from_es_position(sector.0.to_string(), SymbologyItemType::Airports.to_key_string(), entry.identifier, entry.position);
+                let val = AtcMapSymbol::try_from_es_position(sector.0.to_string(), SymbologyItemType::Airports.to_key_string(), entry.identifier, entry.position)?;
                 symbols.insert(val.name.to_string(), val);
             }
 
             // Fixes
             for entry in sector.1.fixes {
-                let val = AtcMapSymbol::from_es_position(sector.0.to_string(), SymbologyItemType::Fixes.to_key_string(), entry.identifier, entry.position);
+                let val = AtcMapSymbol::try_from_es_position(sector.0.to_string(), SymbologyItemType::Fixes.to_key_string(), entry.identifier, entry.position)?;
                 symbols.insert(val.name.to_string(), val);
             }
 
             // VORs
             for entry in sector.1.vors {
-                let val = AtcMapSymbol::from_es_position(sector.0.to_string(), SymbologyItemType::Vors.to_key_string(), entry.identifier, entry.position);
+                let val = AtcMapSymbol::try_from_es_position(sector.0.to_string(), SymbologyItemType::Vors.to_key_string(), entry.identifier, entry.position)?;
                 symbols.insert(val.name.to_string(), val);
             }
 
             // NDBs
             for entry in sector.1.ndbs {
-                let val = AtcMapSymbol::from_es_position(sector.0.to_string(), SymbologyItemType::Ndbs.to_key_string(), entry.identifier, entry.position);
+                let val = AtcMapSymbol::try_from_es_position(sector.0.to_string(), SymbologyItemType::Ndbs.to_key_string(), entry.identifier, entry.position)?;
                 symbols.insert(val.name.to_string(), val);
             }
         }
@@ -139,26 +139,26 @@ impl TryFrom<EuroScopeResult> for AtcScopePackage {
                 for attr in symbol.defs {
                     if attr.attribute == "name" {
                         name_cfg.color = attr.color;
-                        name_cfg.line_style = attr.line_style;
+                        name_cfg.line_style = attr.line_style.into();
                         name_cfg.line_weight = attr.line_weight;
                         name_cfg.size = attr.size;
                         name_cfg.text_align = attr.text_align;
                     } else {
                         symb_cfg.color = attr.color;
-                        symb_cfg.line_style = attr.line_style;
+                        symb_cfg.line_style = attr.line_style.into();
                         symb_cfg.line_weight = attr.line_weight;
                         symb_cfg.size = attr.size;
                         symb_cfg.text_align = attr.text_align;
                     }
                 }
                 symbol_defaults.insert(symbol.item_type.to_key_string(), (symb_cfg, name_cfg));
-            } else if matches!(symbol.item_type, SymbologyItemType::ArtccBoundary | SymbologyItemType::ArtccHighBoundary | SymbologyItemType::ArtccLowBoundary | SymbologyItemType::Geo | SymbologyItemType::LowAirways | SymbologyItemType::HighAirways | SymbologyItemType::Region) {
+            } else if matches!(symbol.item_type, SymbologyItemType::ArtccBoundary | SymbologyItemType::ArtccHighBoundary | SymbologyItemType::ArtccLowBoundary | SymbologyItemType::Geo | SymbologyItemType::LowAirways | SymbologyItemType::HighAirways | SymbologyItemType::Region | SymbologyItemType::Sids | SymbologyItemType::Stars) {
                 let mut cfg = DisplayDefaultConfig::default();
 
                 for attr in symbol.defs {
                     if attr.attribute == "line" {
                         cfg.color = attr.color;
-                        cfg.line_style = attr.line_style;
+                        cfg.line_style = attr.line_style.into();
                         cfg.line_weight = attr.line_weight;
                         cfg.size = attr.size;
                         cfg.text_align = attr.text_align;

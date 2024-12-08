@@ -1,5 +1,6 @@
 use geojson::{Feature, Geometry, Value};
 use serde::{Deserialize, Serialize};
+use serde_json::Map;
 
 use crate::loaders::euroscope::position::{Position, Valid};
 
@@ -12,10 +13,14 @@ pub struct AtcMapSymbol {
 }
 
 impl AtcMapSymbol {
-    pub fn from_es_position(sector_file_id: String, item_type: String, ident: String, position: Position<Valid>) -> Self {
-        let ident = format!("{}_{}_{}", sector_file_id.to_string(), item_type.to_string(), ident.to_string());
-                AtcMapSymbol {
-                    name: ident.to_string(),
+    pub fn try_from_es_position(sector_file_id: String, item_type: String, ident: String, position: Position<Valid>) -> anyhow::Result<Self> {
+        let id = format!("{}_{}_{}", sector_file_id.to_string(), item_type.to_string(), ident.to_string());
+        // Properties
+        let mut props_map = Map::new();
+        props_map.insert("text".to_string(), serde_json::to_value(ident.to_string())?);
+
+                Ok(AtcMapSymbol {
+                    name: id.to_string(),
                     symbol_type: item_type.to_string(),
                     feature: Feature {
                         id: None,
@@ -24,9 +29,8 @@ impl AtcMapSymbol {
                         geometry: Some(Geometry::new(Value::Point(
                             vec![position.lon, position.lat]
                         ))),
-                        properties: None
+                        properties: Some(props_map)
                     }
-                }
-
+                })
     }
 }

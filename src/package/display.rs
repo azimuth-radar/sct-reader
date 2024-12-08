@@ -14,12 +14,35 @@ pub enum AtcDisplayItem {
     NavdataItem{symbol_type: String, ident: String, show_symbol: bool, show_label: bool},
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[repr(u8)]
+pub enum LineStyle {
+    #[default]
+    Solid = 0,
+    Dash = 1,
+    Dot = 2,
+    DashDot = 3,
+    DashDotDot = 4
+}
+
+impl From<u8> for LineStyle {
+    fn from(value: u8) -> Self {
+        match value {
+            1 => Self::Dash,
+            2 => Self::Dot,
+            3 => Self::DashDot,
+            4 => Self::DashDotDot,
+            _ => Self::Solid
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct DisplayDefaultConfig {
     pub color: Colour,
     pub size: f32,
     pub line_weight: u8,
-    pub line_style: u8,
+    pub line_style: LineStyle,
     pub text_align: u8,
 }
 

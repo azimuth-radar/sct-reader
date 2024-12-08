@@ -91,6 +91,7 @@ impl AtcMap {
             let mut props_map = Map::new();
             props_map.insert("textColor".to_string(), serde_json::to_value(format!("#{:02X}{:02X}{:02X}", label.colour.r, label.colour.g, label.colour.b))?);
             props_map.insert("text".to_string(), serde_json::to_value(label.name.to_string())?);
+            props_map.insert("showText".to_string(), serde_json::to_value(true)?);
 
             features.push(Feature {
                 id: None,

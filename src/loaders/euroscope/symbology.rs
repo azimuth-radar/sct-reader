@@ -135,8 +135,8 @@ impl SymbologyInfo {
                                     attribute: items[1].to_string(),
                                     color: Colour::from(items[2].parse::<u32>()?),
                                     size: items[3].parse()?,
-                                    line_weight: items[4].parse()?,
-                                    line_style: items[5].parse()?,
+                                    line_weight: items[5].parse()?,
+                                    line_style: items[4].parse()?,
                                     text_align: items[6].parse()?
                                 };
 
