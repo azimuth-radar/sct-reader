@@ -36,5 +36,6 @@ fn test_load_es_1(){
 
     serde_json::to_writer_pretty(BufWriter::new(File::create("test.json").unwrap()), &package);
 
-    println!("{:#?}", es);
+    let a = package.maps.get("/Users/pshivaraman/Documents/EuroScope/UK/Belfast/Sector/Belfast.sct_regions_Belfast City");
+    //println!("{:#?}", es);
 }

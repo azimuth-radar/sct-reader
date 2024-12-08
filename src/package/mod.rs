@@ -1,22 +1,33 @@
 use std::collections::HashMap;
 
 use aviation_calc_util::{geo::{Bearing, GeoPoint}, units::{Angle, Length}};
+use display::{AtcDisplay, DisplayDefaultConfig};
 use geojson::{Feature, FeatureCollection, GeoJson, Geometry, Value};
+use map::AtcMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Map;
+use symbol::AtcMapSymbol;
 
 use crate::loaders::euroscope::{colour::Colour, line::{ColouredLine, LineGroup}, loader::EuroScopeResult, sector::{LabelGroup, RegionGroup}, symbology::SymbologyItemType, EsAsr};
 
+mod facility;
+pub use facility::AtcFacility;
+
+pub mod display;
+pub mod map;
+pub mod symbol;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct AtcScopePackage {
     pub facilities: Vec<AtcFacility>,
-    pub maps: HashMap<String, AtcMap>
+    pub maps: HashMap<String, AtcMap>,
+    pub symbols: HashMap<String, AtcMapSymbol>
 }
 
 impl TryFrom<EuroScopeResult> for AtcScopePackage {
     fn try_from(value: EuroScopeResult) -> anyhow::Result<Self> {
         let mut maps = HashMap::new();
+        let mut symbols = HashMap::new();
         let mut new_facility = AtcFacility::default();
         new_facility.name = value.prf_name;
 
@@ -91,6 +102,30 @@ impl TryFrom<EuroScopeResult> for AtcScopePackage {
 
                 maps.insert(val.name.to_string(), val);
             }
+
+            // Airports
+            for entry in sector.1.airports {
+                let val = AtcMapSymbol::from_es_position(sector.0.to_string(), SymbologyItemType::Airports.to_key_string(), entry.identifier, entry.position);
+                symbols.insert(val.name.to_string(), val);
+            }
+
+            // Fixes
+            for entry in sector.1.fixes {
+                let val = AtcMapSymbol::from_es_position(sector.0.to_string(), SymbologyItemType::Fixes.to_key_string(), entry.identifier, entry.position);
+                symbols.insert(val.name.to_string(), val);
+            }
+
+            // VORs
+            for entry in sector.1.vors {
+                let val = AtcMapSymbol::from_es_position(sector.0.to_string(), SymbologyItemType::Vors.to_key_string(), entry.identifier, entry.position);
+                symbols.insert(val.name.to_string(), val);
+            }
+
+            // NDBs
+            for entry in sector.1.ndbs {
+                let val = AtcMapSymbol::from_es_position(sector.0.to_string(), SymbologyItemType::Ndbs.to_key_string(), entry.identifier, entry.position);
+                symbols.insert(val.name.to_string(), val);
+            }
         }
 
         // Parse ASRs
@@ -141,180 +176,10 @@ impl TryFrom<EuroScopeResult> for AtcScopePackage {
 
         Ok(AtcScopePackage {
             facilities: vec![new_facility],
+            symbols: symbols,
             maps: maps
         })
     }
     
     type Error = anyhow::Error;
-}
-
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct AtcFacility {
-    pub name: String,
-    pub displays: Vec<AtcDisplay>,
-    pub child_facilities: Vec<AtcFacility>
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum AtcDisplayItem {
-    Map{id: String},
-    Symbol{symbol_type: String, ident: String, label: bool},
-}
-
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct DisplayDefaultConfig {
-    pub color: Colour,
-    pub size: f32,
-    pub line_weight: u8,
-    pub line_style: u8,
-    pub text_align: u8,
-}
-
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct AtcDisplay {
-    pub name: String,
-    pub center: GeoPoint,
-    pub screen_height: Length,
-    pub rotation: Angle,
-    pub display_items: Vec<AtcDisplayItem>,
-    pub map_defaults: HashMap<String, DisplayDefaultConfig>,
-    pub symbol_defaults:  HashMap<String, (DisplayDefaultConfig, DisplayDefaultConfig)>,
-}
-
-impl AtcDisplay {
-    fn from_es_asr(default_sector_id: String, map_defaults: HashMap<String, DisplayDefaultConfig>, symbol_defaults: HashMap<String, (DisplayDefaultConfig, DisplayDefaultConfig)>, value: EsAsr) -> Self {
-        let mut ret_val = AtcDisplay::default();
-        ret_val.name = value.name;
-        ret_val.map_defaults = map_defaults;
-        ret_val.symbol_defaults = symbol_defaults;
-
-        // Center
-        let dist = (value.window_area.1 - value.window_area.0) / 2;
-        let bearing = GeoPoint::initial_bearing(&value.window_area.0, &value.window_area.1);
-        let mut center = value.window_area.1.clone();
-        center.move_by(bearing, dist);
-        ret_val.center = center;
-
-        // Screen Height
-        let theta = (Bearing::from_radians(0_f64) - bearing) + value.display_rotation;
-        ret_val.screen_height = dist * 2 * theta.as_radians().cos().abs();
-        ret_val.rotation = value.display_rotation;
-
-        let mut items = Vec::new();
-
-        let sector_id = value.sector_file_id.clone().unwrap_or(default_sector_id.to_string());
-
-        for item in value.display_items {
-            if matches!(item.item_type, SymbologyItemType::Airports | SymbologyItemType::Fixes | SymbologyItemType::Ndbs | SymbologyItemType::Vors) {
-                items.push(AtcDisplayItem::Symbol { ident: item.name, label: item.attribute == "name", symbol_type: item.item_type.to_key_string() })
-            } else if matches!(item.item_type, SymbologyItemType::ArtccBoundary | SymbologyItemType::ArtccHighBoundary | SymbologyItemType::ArtccLowBoundary | SymbologyItemType::Geo | SymbologyItemType::HighAirways | SymbologyItemType::LowAirways | SymbologyItemType::Region | SymbologyItemType::Sids | SymbologyItemType::Stars) {
-                items.push(AtcDisplayItem::Map { id: format!("{}_{}_{}", sector_id.to_string(), item.item_type.to_key_string(), item.name) })
-            }
-        }
-
-        ret_val.display_items = items;
-
-        ret_val
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AtcMap {
-    pub name: String,
-    pub features: FeatureCollection
-}
-
-impl AtcMap {
-    pub fn try_from_es_line_group(sector_file_id: String, item_type: String, value: LineGroup<ColouredLine>) -> anyhow::Result<Self> {
-        let name = format!("{}_{}_{}", sector_file_id, item_type, value.name);
-        let mut features = Vec::with_capacity(value.lines.len());
-        for line in value.lines {
-            // Properties
-            let mut props_map = Map::new();
-            if let Some(line_color) = line.colour {
-                props_map.insert("color".to_string(), serde_json::to_value(format!("#{:02X}{:02X}{:02X}", line_color.r, line_color.g, line_color.b))?);
-            }
-
-            features.push(Feature {
-                id: None,
-                bbox: None,
-                foreign_members: None,
-                geometry: Some(Geometry::new(Value::LineString(
-                    vec![
-                        vec![line.line.start.lon, line.line.start.lat],
-                        vec![line.line.end.lon, line.line.end.lat]
-                    ]
-                ))),
-                properties: Some(props_map)
-            });
-        }
-
-        Ok(AtcMap {
-            name: name,
-            features: FeatureCollection {
-                bbox: None,
-                features: features,
-                foreign_members: None
-            }
-        })
-    }
-
-    pub fn try_from_es_region_group(sector_file_id: String, item_type: String, value: RegionGroup) -> anyhow::Result<Self> {
-        let name = format!("{}_{}_{}", sector_file_id, item_type, value.name);
-        let mut features = Vec::with_capacity(value.regions.capacity());
-        for region in value.regions {
-            // Properties
-            let mut props_map = Map::new();
-            props_map.insert("color".to_string(), serde_json::to_value(format!("#{:02X}{:02X}{:02X}", region.colour.r, region.colour.g, region.colour.b))?);
-
-            features.push(Feature {
-                id: None,
-                bbox: None,
-                foreign_members: None,
-                geometry: Some(Geometry::new(Value::Polygon(
-                    vec![region.vertices.iter().map(|vert| vec![vert.lon, vert.lat]).collect::<Vec<Vec<f64>>>()]
-                ))),
-                properties: Some(props_map)
-            });
-        }
-
-        Ok(AtcMap {
-            name: name,
-            features: FeatureCollection {
-                bbox: None,
-                features: features,
-                foreign_members: None
-            }
-        })
-    }
-
-    pub fn try_from_es_labels_group(sector_file_id: String, item_type: String, value: LabelGroup) -> anyhow::Result<Self> {
-        let name = format!("{}_{}_{}", sector_file_id, item_type, value.name);
-        let mut features = Vec::with_capacity(value.labels.capacity());
-        for label in value.labels {
-            // Properties
-            let mut props_map = Map::new();
-            props_map.insert("color".to_string(), serde_json::to_value(format!("#{:02X}{:02X}{:02X}", label.colour.r, label.colour.g, label.colour.b))?);
-            props_map.insert("text".to_string(), serde_json::to_value(label.name.to_string())?);
-
-            features.push(Feature {
-                id: None,
-                bbox: None,
-                foreign_members: None,
-                geometry: Some(Geometry::new(Value::Point(
-                    vec![label.position.lon, label.position.lat]
-                ))),
-                properties: Some(props_map)
-            });
-        }
-
-        Ok(AtcMap {
-            name: name,
-            features: FeatureCollection {
-                bbox: None,
-                features: features,
-                foreign_members: None
-            }
-        })
-    }
 }
