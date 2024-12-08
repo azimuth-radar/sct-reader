@@ -8,6 +8,7 @@ use super::symbology::SymbologyItemType;
 #[derive(Debug, Clone, Default)]
 pub struct EsAsr {
     pub name: String,
+    pub file_name: String,
     pub display_type_name: String,
     pub display_type_need_radar_content: bool,
     pub display_type_geo_reference: bool,
@@ -34,6 +35,7 @@ impl EsAsr {
         let file_reader = BufReader::new(File::open(&asr_file)?);
         let mut ret_val = Self::default();
         let mut sector_file = "".to_string();
+        ret_val.file_name = asr_file.as_ref().to_str().unwrap().to_string();
 
         for line in file_reader.lines() {
             if let Ok(line_str) = line {

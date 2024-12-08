@@ -1,8 +1,9 @@
-use std::path::Path;
+use std::{fs::File, io::BufWriter, path::Path};
 
 use directories::UserDirs;
 
-use crate::loaders::euroscope::EuroScopeLoader;
+use crate::{loaders::euroscope::loader::EuroScopeLoader, package::AtcScopePackage};
+
 
 #[test]
 fn test_convert_es_path_1(){
@@ -29,7 +30,11 @@ fn test_convert_es_path_2(){
 fn test_load_es_1(){
     let prf_path = "/Users/pshivaraman/Documents/EuroScope/UK/Belfast/Belfast Combined.prf";
     let mut es = EuroScopeLoader::try_new_from_prf(prf_path).unwrap();
-    es.process_data().unwrap();
+    let result = es.try_read().unwrap();
+
+    let package = AtcScopePackage::try_from(result).unwrap();
+
+    serde_json::to_writer_pretty(BufWriter::new(File::create("test.json").unwrap()), &package);
 
     println!("{:#?}", es);
 }

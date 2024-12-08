@@ -10,8 +10,7 @@ pub mod reader;
 pub mod sector;
 pub mod waypoint;
 pub mod symbology;
-mod loader;
-pub use loader::EuroScopeLoader;
+pub mod loader;
 mod asr;
 pub use asr::EsAsr;
 
