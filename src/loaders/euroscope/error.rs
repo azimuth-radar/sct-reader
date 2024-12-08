@@ -20,6 +20,7 @@ pub enum Error {
     InvalidGeoEntry,
     InvalidRegion,
     InvalidLabel,
+    InvalidOffset
 }
 
 impl Display for Error {
@@ -46,6 +47,7 @@ impl Display for Error {
                 Self::InvalidGeoEntry => "Invalid geo Entry",
                 Self::InvalidRegion => "Invalid region",
                 Self::InvalidLabel => "Invalid label",
+                Self::InvalidOffset => "Invalid offset"
             }
         )
     }

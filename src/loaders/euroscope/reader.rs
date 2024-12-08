@@ -50,6 +50,9 @@ impl<R: BufRead> SctReader<R> {
                     }
                     continue;
                 }
+                if line.starts_with("OFFSET") {
+                    
+                }
                 if line.starts_with("#define") {
                     self.current_section = FileSection::ColourDefinitions;
                 }
