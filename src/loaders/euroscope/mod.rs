@@ -4,7 +4,7 @@ use error::Error;
 pub mod colour;
 pub mod error;
 pub mod line;
-mod partial;
+pub(crate) mod partial;
 pub mod position;
 pub mod reader;
 pub mod sector;

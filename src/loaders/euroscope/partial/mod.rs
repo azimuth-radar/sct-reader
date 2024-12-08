@@ -19,7 +19,7 @@ pub mod region;
 pub mod sector_info;
 
 #[derive(Debug, Default)]
-pub struct PositionCreator {
+pub(crate) struct PositionCreator {
     offset: [f64; 2],
 }
 impl PositionCreator {
