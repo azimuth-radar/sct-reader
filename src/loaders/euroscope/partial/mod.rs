@@ -321,42 +321,47 @@ impl PartialSector {
         value: &str,
         sid_star_type: SidStarType,
     ) -> SectorResult<()> {
-        let value = value.replace('\t',"    ");
-        let name = value.get(0..26).ok_or(Error::InvalidSidStarEntry)?.trim();
-        let mut sections = value
-            .get(26..)
-            .ok_or(Error::InvalidSidStarEntry)?
-            .trim()
-            .split_whitespace();
-        let lat_a = sections.next().ok_or(Error::InvalidSidStarEntry)?;
-        let lon_a = sections.next().ok_or(Error::InvalidSidStarEntry)?;
-        let lat_b = sections.next().ok_or(Error::InvalidSidStarEntry)?;
-        let lon_b = sections.next().ok_or(Error::InvalidSidStarEntry)?;
-        let colour = sections
-            .next()
-            .and_then(|x| self.try_fetch_or_decode_colour(x));
+        let sections = value.trim().split_whitespace().collect::<Vec<_>>();
+        let (first_coord_index, colour) = match sections.len() {
+            0..4 => return Err(Error::InvalidSidStarEntry),
+            4 => (0, None),
+            _ => if let Some(colour) = self.try_fetch_or_decode_colour(sections.last().unwrap()) {
+                (sections.len() - 5, Some(colour))
+            } else {
+                (sections.len() - 4, None)
+            }
+        };
+
+        let name = if first_coord_index > 0 {
+            Some(sections[0..first_coord_index].join(" "))
+        } else {
+            None
+        };
+
         let line = self
-            .try_fetch_or_decode_lat_lon(lat_a, lon_a)
+            .try_fetch_or_decode_lat_lon(sections[first_coord_index], sections[first_coord_index + 1])
             .and_then(|pos| pos.validate().ok())
             .and_then(|start_pos| {
-                self.try_fetch_or_decode_lat_lon(lat_b, lon_b)
+                self.try_fetch_or_decode_lat_lon(sections[first_coord_index + 2], sections[first_coord_index + 3])
                     .and_then(|pos| pos.validate().ok())
                     .and_then(|end_pos| Some(ColouredLine::new(start_pos, end_pos, colour)))
             });
+
+
 
         let vec = match sid_star_type {
             SidStarType::Sid => &mut self.sid_entries,
             SidStarType::Star => &mut self.star_entries,
         };
 
-        if name.is_empty() {
+        if name.is_none() {
             let in_progress_entry = vec.last_mut().ok_or(Error::InvalidSidStarEntry)?;
             if let Some(line) = line {
                 in_progress_entry.lines.push(line);
             }
         } else {
             let new_entry = LineGroup::new(
-                name.to_owned(),
+                name.unwrap(),
                 if let Some(line) = line {
                     vec![line]
                 } else {
@@ -457,7 +462,6 @@ impl PartialSector {
             // We set the current region name
             let name = sections[1..].join(" ");
             self.current_region_name = name.clone();
-            println!("2");
             return Ok(());
         }
         // If a colour is defined, this is a new region. We see if any with the same name already exist, otherwise create it.
@@ -493,7 +497,6 @@ impl PartialSector {
             .map(|pos| pos.validate().ok())
             .flatten()
         {
-            println!("6");
             self.region_groups
                 .iter_mut()
                 .find(|region_group| region_group.name == self.current_region_name)
