@@ -448,7 +448,6 @@ impl PartialSector {
     pub fn parse_region_line(&mut self, value: &str) -> SectorResult<()> {
         let mut sections = value.split_whitespace().collect::<Vec<_>>();
         if sections.len() < 2 {
-            println!("1");
             return Err(Error::InvalidRegion);
         }
 
@@ -462,7 +461,6 @@ impl PartialSector {
         }
         // If a colour is defined, this is a new region. We see if any with the same name already exist, otherwise create it.
         else if sections.len() == 3 {
-            println!("3");
             let colour = self
                 .try_fetch_or_decode_colour(sections[0])
                 .ok_or(Error::InvalidRegion)?;
@@ -471,13 +469,11 @@ impl PartialSector {
                 .iter_mut()
                 .find(|region_group| region_group.name == self.current_region_name)
             {
-                println!("4");
                 region_group.regions.push(PartialRegion {
                     colour: Some(colour),
                     vertices: vec![],
                 });
             } else {
-                println!("5");
                 self.region_groups.push(PartialRegionGroup {
                     name: self.current_region_name.clone(),
                     regions: vec![
