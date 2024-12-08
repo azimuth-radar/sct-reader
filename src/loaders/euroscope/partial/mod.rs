@@ -321,6 +321,7 @@ impl PartialSector {
         value: &str,
         sid_star_type: SidStarType,
     ) -> SectorResult<()> {
+        let value = value.replace('\t',"    ");
         let name = value.get(0..26).ok_or(Error::InvalidSidStarEntry)?.trim();
         let mut sections = value
             .get(26..)
