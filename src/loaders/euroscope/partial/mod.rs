@@ -570,7 +570,7 @@ impl PartialSector {
     }
 }
 
-fn parse_runway_identifier(value: &str) -> SectorResult<(u8, RunwayModifier)> {
+pub(crate) fn parse_runway_identifier(value: &str) -> SectorResult<(u8, RunwayModifier)> {
     let modifier = if value.ends_with('L') {
         RunwayModifier::Left
     } else if value.ends_with('C') {

@@ -85,12 +85,12 @@ impl<R: BufRead> EseReader<R> {
 
                 let result = match self.current_section {
                     FileSection::FreeText => self.partial_ese.parse_freetext_line(line),
-                    _ => continue,
-                    // FileSection::SidsStars => todo!(),
+                    FileSection::SidsStars => self.partial_ese.parse_sids_stars_line(line),
                     // FileSection::Positions => todo!(),
                     // FileSection::Airspace => todo!(),
                     // FileSection::Radar => todo!(),
                     // FileSection::Ground => todo!(),
+                    _ => continue,
                 };
                 if let Err(e) = result {
                     self.errors.push((line_number, line.to_owned(), e));

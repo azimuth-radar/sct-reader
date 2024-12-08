@@ -130,7 +130,7 @@ impl RunwayEnd {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum RunwayModifier {
     Left,
     Right,

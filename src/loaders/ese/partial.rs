@@ -1,14 +1,15 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, str::FromStr};
 
 use crate::loaders::euroscope::{colour::Colour, error::Error, partial::PositionCreator, SectorResult};
 
-use super::{FreeText, FreeTextGroup};
+use super::{Airport, FreeText, FreeTextGroup, Procedure, ProcedureType, RunwayIdentifier};
 
 #[derive(Default)]
 pub struct PartialEse {
     pub colours: HashMap<String, Colour>,
     position_creator: PositionCreator,
     pub free_text: Vec<FreeTextGroup>,
+    pub sids_stars: Vec<Airport>,
 }
 impl PartialEse {
 
@@ -65,6 +66,51 @@ impl PartialEse {
         
         group.entries.push(FreeText { position: pos, text: text.to_owned() });
 
+        Ok(())
+    }
+
+    pub fn parse_sids_stars_line(&mut self, value: &str) -> SectorResult<()> {
+        let mut sections = value.split(':');
+        let proc_type = match sections.next() {
+            Some("SID") => ProcedureType::SID,
+            Some("STAR") => ProcedureType::STAR,
+            _ => return Err(Error::InvalidSidStarEntry),
+        };
+        let icao_identifier = sections.next().ok_or(Error::InvalidSidStarEntry)?;
+        if icao_identifier.len() < 2 {
+            return Err(Error::InvalidSidStarEntry);
+        }
+        let runway_identifier = sections.next().and_then(|rwy| RunwayIdentifier::from_str(rwy).ok()).ok_or(Error::InvalidRunway)?;
+        let procedure_identifier = sections.next().ok_or(Error::InvalidSidStarEntry)?.to_owned();
+        let route = sections.map(|wp| wp.to_owned()).collect::<Vec<_>>();
+
+        if route.is_empty() {
+            return Err(Error::InvalidSidStarEntry);
+        }
+
+        // Find airport or create if it doesn't exist
+        let airport = match self.sids_stars.iter_mut().find(|airport| airport.identifier == icao_identifier) {
+            Some(airport) => airport,
+            None => {
+                self.sids_stars.push(Airport { identifier: icao_identifier.to_owned(), runways: HashMap::new() });
+                self.sids_stars.last_mut().unwrap()
+            },
+        };
+
+        // Find runway or create if it doesn't exist
+        let runway = match airport.runways.get_mut(&runway_identifier) {
+            Some(runway) => runway,
+            None => {
+                airport.runways.insert(runway_identifier.clone(), Vec::new());
+                airport.runways.get_mut(&runway_identifier).unwrap()
+            }
+        };
+        let procedure = Procedure {
+            identifier: procedure_identifier,
+            proc_type,
+            route
+        };
+        runway.push(procedure);
         Ok(())
     }
 }
