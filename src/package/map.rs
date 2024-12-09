@@ -2,7 +2,7 @@ use geojson::{Feature, FeatureCollection, Geometry, Value};
 use serde::{Deserialize, Serialize};
 use serde_json::Map;
 
-use crate::loaders::euroscope::{line::{ColouredLine, LineGroup}, sector::{LabelGroup, RegionGroup}};
+use crate::loaders::{ese::FreeTextGroup, euroscope::{line::{ColouredLine, LineGroup}, sector::{LabelGroup, RegionGroup}}};
 
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -91,6 +91,37 @@ impl AtcMap {
             let mut props_map = Map::new();
             props_map.insert("textColor".to_string(), serde_json::to_value(format!("#{:02X}{:02X}{:02X}", label.colour.r, label.colour.g, label.colour.b))?);
             props_map.insert("text".to_string(), serde_json::to_value(label.name.to_string())?);
+            props_map.insert("showText".to_string(), serde_json::to_value(true)?);
+
+            features.push(Feature {
+                id: None,
+                bbox: None,
+                foreign_members: None,
+                geometry: Some(Geometry::new(Value::Point(
+                    vec![label.position.lon, label.position.lat]
+                ))),
+                properties: Some(props_map)
+            });
+        }
+
+        Ok(AtcMap {
+            name: name,
+            map_type: item_type,
+            features: FeatureCollection {
+                bbox: None,
+                features: features,
+                foreign_members: None
+            }
+        })
+    }
+
+    pub fn try_from_es_freetext_group(sector_file_id: String, item_type: String, value: FreeTextGroup) -> anyhow::Result<Self> {
+        let name = format!("{}_{}_{}", sector_file_id, item_type, value.name);
+        let mut features = Vec::with_capacity(value.entries.capacity());
+        for label in value.entries {
+            // Properties
+            let mut props_map = Map::new();
+            props_map.insert("text".to_string(), serde_json::to_value(label.text.to_string())?);
             props_map.insert("showText".to_string(), serde_json::to_value(true)?);
 
             features.push(Feature {

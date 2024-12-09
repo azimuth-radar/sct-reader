@@ -5,7 +5,7 @@ use geojson::{Feature, FeatureCollection, Geometry, Value};
 use serde::{Deserialize, Serialize};
 use serde_json::Map;
 
-use crate::loaders::euroscope::{colour::Colour, line::{ColouredLine, LineGroup}, sector::RegionGroup, symbology::SymbologyItemType, EsAsr};
+use crate::loaders::euroscope::{colour::Colour, line::{ColouredLine, LineGroup}, sector::RegionGroup, symbology::{self, SymbologyInfo, SymbologyItemType}, EsAsr};
 
 use super::symbol::SymbolIcon;
 
@@ -87,6 +87,64 @@ pub struct AtcDisplayType {
     pub symbol_icons: HashMap<String, SymbolIcon>
 }
 
+impl AtcDisplayType {
+    pub fn try_from_es_symbology(id: String, symbology: SymbologyInfo) -> anyhow::Result<Self> {
+        let mut map_defaults = HashMap::new();
+        let mut symbol_defaults = HashMap::new();
+        let mut symbol_icons = HashMap::new();
+
+        for symbol in symbology.symbols {
+            if matches!(symbol.item_type, SymbologyItemType::Airports | SymbologyItemType::Fixes | SymbologyItemType::Vors | SymbologyItemType::Ndbs) {
+                let mut symb_cfg = DisplayDefaultConfig::default();
+                let mut name_cfg = DisplayDefaultConfig::default();
+                for attr in symbol.defs {
+                    if attr.attribute == "name" {
+                        name_cfg.color = attr.color;
+                        name_cfg.line_style = attr.line_style.into();
+                        name_cfg.line_weight = attr.line_weight;
+                        name_cfg.size = attr.size;
+                        name_cfg.text_align = attr.text_align.into();
+                    } else {
+                        symb_cfg.color = attr.color;
+                        symb_cfg.line_style = attr.line_style.into();
+                        symb_cfg.line_weight = attr.line_weight;
+                        symb_cfg.size = attr.size;
+                        symb_cfg.text_align = attr.text_align.into();
+                    }
+                }
+                symbol_defaults.insert(symbol.item_type.to_key_string(), (symb_cfg, name_cfg));
+            } else if matches!(symbol.item_type, SymbologyItemType::ArtccBoundary | SymbologyItemType::ArtccHighBoundary | SymbologyItemType::ArtccLowBoundary | SymbologyItemType::Geo | SymbologyItemType::LowAirways | SymbologyItemType::HighAirways | SymbologyItemType::Region | SymbologyItemType::Sids | SymbologyItemType::Stars) {
+                let mut cfg = DisplayDefaultConfig::default();
+
+                for attr in symbol.defs {
+                    if attr.attribute == "line" {
+                        cfg.color = attr.color;
+                        cfg.line_style = attr.line_style.into();
+                        cfg.line_weight = attr.line_weight;
+                        cfg.size = attr.size;
+                        cfg.text_align = attr.text_align.into();
+                    }
+                }
+
+                map_defaults.insert(symbol.item_type.to_key_string(), cfg);
+            }
+        }
+
+        for icon in symbology.symbol_icons {
+            let ret_icon = SymbolIcon::try_from_es_symbol_icon(icon.0, icon.1)?;
+
+            symbol_icons.insert(ret_icon.symbol_type.to_string(), ret_icon);
+        }
+
+        Ok(AtcDisplayType {
+            id: id.to_string(),
+            map_defaults,
+            symbol_defaults,
+            symbol_icons
+        })
+    }
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct AtcDisplay {
     pub name: String,
@@ -120,6 +178,8 @@ impl AtcDisplay {
 
         let sector_id = value.sector_file_id.clone().unwrap_or(default_sector_id.to_string());
 
+        let mut loaded_freetexts= HashMap::new();
+
         for item in value.display_items {
             if matches!(item.item_type, SymbologyItemType::Airports | SymbologyItemType::Fixes | SymbologyItemType::Ndbs | SymbologyItemType::Vors) {
                 let ident = format!("{}_{}_{}", sector_id.to_string(), item.item_type.to_key_string(), item.name);
@@ -144,6 +204,16 @@ impl AtcDisplay {
                 }
             } else if matches!(item.item_type, SymbologyItemType::ArtccBoundary | SymbologyItemType::ArtccHighBoundary | SymbologyItemType::ArtccLowBoundary | SymbologyItemType::Geo | SymbologyItemType::HighAirways | SymbologyItemType::LowAirways | SymbologyItemType::Region | SymbologyItemType::Sids | SymbologyItemType::Stars) {
                 items.push(AtcDisplayItem::Map { id: format!("{}_{}_{}", sector_id.to_string(), item.item_type.to_key_string(), item.name) })
+            } else if matches!(item.item_type, SymbologyItemType::Label) {
+                if item.attribute == "freetext" {
+                    let name_split = item.name.split("\\").collect::<Vec<&str>>();
+                    if name_split.len() >= 1 {
+                        if !loaded_freetexts.contains_key(&name_split[0].to_string()) {
+                            items.push(AtcDisplayItem::Map {id: format!("{}_{}_{}", sector_id.to_string(), item.item_type.to_key_string(), name_split[0].to_string())});
+                            loaded_freetexts.insert(name_split[0].to_string(), ());
+                        }
+                    }
+                }
             }
         }
 
