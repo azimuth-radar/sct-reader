@@ -28,7 +28,7 @@ fn test_convert_es_path_2(){
 #[test]
 #[ignore]
 fn test_load_es_1(){
-    let prf_path = "/Users/pshivaraman/Documents/EuroScope/UK/Belfast/Belfast Combined.prf";
+    let prf_path = r#"C:\Users\Caspian\AppData\Roaming\EuroScope\UK\Area\London AC\South Central.prf"#;
     let mut es = EuroScopeLoader::try_new_from_prf(prf_path).unwrap();
     let result = es.try_read().unwrap();
 
@@ -36,6 +36,6 @@ fn test_load_es_1(){
 
     serde_json::to_writer_pretty(BufWriter::new(File::create("test.json").unwrap()), &package);
 
-    let a = package.maps.get("/Users/pshivaraman/Documents/EuroScope/UK/Belfast/Sector/Belfast.sct_regions_Belfast City");
+    //let a = package.maps.get("/Users/pshivaraman/Documents/EuroScope/UK/Belfast/Sector/Belfast.sct_regions_Belfast City");
     //println!("{:#?}", es);
 }

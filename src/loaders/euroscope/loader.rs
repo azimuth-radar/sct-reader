@@ -105,16 +105,20 @@ impl EuroScopeLoader {
         // Load ASRs
         for asr_source in &self.asr_files {
             let mut asr = EsAsr::try_from_asr_file(&asr_source.1)?;
-            let asr_sector_path = Self::try_convert_es_path(&self.prf_file, &asr.1)?.canonicalize()?.to_str().unwrap().to_owned();
-
-            if !ret_val.sectors.contains_key(&asr_sector_path) {
-                let asr_sct_reader = SctReader::new(BufReader::new(File::open(&asr_sector_path)?));
-                let asr_sct_result = asr_sct_reader.try_read()?;
-                ret_val.sectors.insert(asr_sector_path.to_string(), asr_sct_result);
+            if !asr.1.is_empty() {
+                let asr_sector_path = Self::try_convert_es_path(&self.prf_file, &asr.1)?.canonicalize()?.to_str().unwrap().to_owned();
+                if !ret_val.sectors.contains_key(&asr_sector_path) {
+                    let asr_sct_reader = SctReader::new(BufReader::new(File::open(&asr_sector_path)?));
+                    let asr_sct_result = asr_sct_reader.try_read()?;
+                    ret_val.sectors.insert(asr_sector_path.to_string(), asr_sct_result);
+                }
+    
+                asr.0.sector_file_id = Some(asr_sector_path.to_string());
+            } else {
+                asr.0.sector_file_id = Some(ret_val.default_sector_id.clone());
             }
-
-            asr.0.sector_file_id = Some(asr_sector_path.to_string());
             asr.0.name = Path::new(&asr_source.1).file_stem().unwrap_or_default().to_str().unwrap().to_string();
+
 
             ret_val.asrs.insert(asr_source.0.to_string(), asr.0);
         }
@@ -140,6 +144,19 @@ impl EuroScopeLoader {
                 .context("Could not get parent dir of prf file!")?
                 .join(new_es_path));
         }
+
+        let path = 
+        directories::BaseDirs::new()
+        .context("Failed to get User Directories")?
+        .config_dir()
+        .join("EuroScope")
+        .join(new_es_path.clone());
+
+
+        if path.exists() {
+            return Ok(path);
+        } 
+        
 
         Ok(UserDirs::new()
             .context("Failed to get User Directories")?
