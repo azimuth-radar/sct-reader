@@ -106,9 +106,10 @@ impl EuroScopeLoader {
             Ok(true) => {
                 if let Ok(file) = File::open(&ese_file) {
                     let reader = EseReader::new(BufReader::new(file));
-                    reader.try_read().ok();
+                    reader.try_read().ok()
+                } else{
+                    None
                 }
-                None
             },
             _ => None
         };
@@ -130,9 +131,10 @@ impl EuroScopeLoader {
                         Ok(true) => {
                             if let Ok(file) = File::open(&ese_file) {
                                 let reader = EseReader::new(BufReader::new(file));
-                                reader.try_read().ok();
+                                reader.try_read().ok()
+                            } else {
+                                None 
                             }
-                            None
                         },
                         _ => None
                     };
