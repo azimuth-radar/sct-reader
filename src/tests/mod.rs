@@ -2,7 +2,7 @@ use std::{fs::File, io::BufWriter, path::Path};
 
 use directories::UserDirs;
 
-use crate::{loaders::euroscope::loader::EuroScopeLoader, package::AtcScopePackage};
+use crate::{loaders::{euroscope::loader::EuroScopeLoader, vnas_crc::CrcPackage}, package::AtcScopePackage};
 
 
 #[test]
@@ -34,8 +34,17 @@ fn test_load_es_1(){
 
     let package = AtcScopePackage::try_from(result).unwrap();
 
-    serde_json::to_writer(BufWriter::new(File::create("test.json").unwrap()), &package);
+    serde_json::to_writer(BufWriter::new(File::create(Path::new("target").join("test_es_out.json")).unwrap()), &package);
 
     //let a = package.maps.get("/Users/pshivaraman/Documents/EuroScope/UK/Belfast/Sector/Belfast.sct_regions_Belfast City");
     //println!("{:#?}", es);
+}
+
+#[test]
+#[ignore]
+fn test_load_crc_1() {
+    let crc_path = r#"/Users/pshivaraman/Downloads/CRC/ARTCCs/ZNY.json"#;
+    let package = CrcPackage::try_new_from_file(crc_path).unwrap();
+
+    println!("{:#?}", package);
 }
