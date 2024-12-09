@@ -86,7 +86,7 @@ impl<R: BufRead> EseReader<R> {
                 let result = match self.current_section {
                     FileSection::FreeText => self.partial_ese.parse_freetext_line(line),
                     FileSection::SidsStars => self.partial_ese.parse_sids_stars_line(line),
-                    // FileSection::Positions => todo!(),
+                    FileSection::Positions => self.partial_ese.parse_atc_position_line(line),
                     // FileSection::Airspace => todo!(),
                     // FileSection::Radar => todo!(),
                     // FileSection::Ground => todo!(),

@@ -2,7 +2,7 @@ use std::{collections::HashMap, str::FromStr};
 
 use crate::loaders::euroscope::{colour::Colour, error::Error, partial::PositionCreator, SectorResult};
 
-use super::{Airport, FreeText, FreeTextGroup, Procedure, ProcedureType, RunwayIdentifier};
+use super::{Airport, AtcPosition, FreeText, FreeTextGroup, Procedure, ProcedureType, RunwayIdentifier};
 
 #[derive(Default)]
 pub struct PartialEse {
@@ -10,6 +10,7 @@ pub struct PartialEse {
     position_creator: PositionCreator,
     pub free_text: Vec<FreeTextGroup>,
     pub sids_stars: Vec<Airport>,
+    pub atc_positions: Vec<AtcPosition>,
 }
 impl PartialEse {
 
@@ -111,6 +112,65 @@ impl PartialEse {
             route
         };
         runway.push(procedure);
+        Ok(())
+    }
+
+    pub fn parse_atc_position_line(&mut self, value: &str) -> SectorResult<()> {
+        let mut sections = value.split(':');
+        let name = sections.next().ok_or(Error::InvalidAtcPosition)?;
+        let rt_callsign = sections.next().ok_or(Error::InvalidAtcPosition)?;
+        let radio_freq = sections.next().ok_or(Error::InvalidAtcPosition)?;
+        let short_identifier = sections.next().ok_or(Error::InvalidAtcPosition)?;
+        let middle = sections.next().ok_or(Error::InvalidAtcPosition)?;
+        let left = sections.next().ok_or(Error::InvalidAtcPosition)?;
+        let right = sections.next().ok_or(Error::InvalidAtcPosition)?;
+        
+        if name.is_empty() || rt_callsign.is_empty() || radio_freq.is_empty() || !radio_freq.contains('.') || short_identifier.is_empty() || middle.is_empty() {
+            return Err(Error::InvalidAtcPosition);
+        }
+
+        let mut long_identifier = 
+        if !left.is_empty() {
+            format!("{left}_{middle}")
+        } else {
+            middle.to_string()
+        };
+        if !right.is_empty() {
+            long_identifier.push_str(&format!("_{right}"));
+        }
+        let start_squawk = sections.nth(2).and_then(|s|s.parse::<u16>().ok());
+        let end_squawk = sections.next().and_then(|s|s.parse::<u16>().ok());
+        
+        let mut vis_centres = [None; 4];
+        for i in 0..4 {
+            let lat = match sections.next() {
+                Some(lat) => lat,
+                None => break,
+            };
+            let lon = match sections.next() {
+                Some(lon) => lon,
+                None => break,
+            };
+            let vis_centre = match self.position_creator.try_new_from_es(lat, lon).and_then(|vc| vc.validate()) {
+                Ok(vc) => vc,
+                Err(_) => break,
+            };
+
+            vis_centres[i] = Some(vis_centre);
+        }
+        let atc_position = AtcPosition {
+            name: name.to_owned(),
+            rt_callsign: rt_callsign.to_owned(),
+            radio_freq: radio_freq.to_owned(),
+            short_identifier: short_identifier.to_owned(),
+            full_identifier: long_identifier,
+            start_squawk,
+            end_squawk,
+            vis_centres
+        };
+
+        self.atc_positions.push(atc_position);
+
         Ok(())
     }
 }

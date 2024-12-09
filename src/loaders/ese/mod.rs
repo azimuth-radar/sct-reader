@@ -20,6 +20,7 @@ pub struct Ese {
     pub free_text: Vec<FreeTextGroup>,
     pub sids_stars: Vec<Airport>,
     pub non_critical_errors: Vec<(usize, String, Error)>,
+    pub atc_positions: Vec<AtcPosition>,
 }
 impl TryFrom<PartialEse> for Ese {
     type Error = Error;
@@ -28,6 +29,7 @@ impl TryFrom<PartialEse> for Ese {
             colours: value.colours,
             free_text: value.free_text,
             sids_stars: value.sids_stars,
+            atc_positions: value.atc_positions,
             non_critical_errors: vec![],
         };
         Ok(ese)
@@ -97,12 +99,16 @@ impl Display for RunwayIdentifier {
     }
 }
 
-
-#[test]
-fn test_ese() {
-    let ese_file = BufReader::new(File::open("/home/caspian/Downloads/uk_controller_pack_2024_12/UK/Data/Sector/UK_2024_12.ese").unwrap());
-    let ese_reader = reader::EseReader::new(ese_file);
-    let ese = ese_reader.try_read().unwrap();
-    println!("{:#?}", ese.sids_stars);
-    println!("{:#?}", ese.non_critical_errors);
+#[derive(Debug)]
+pub struct AtcPosition {
+    pub name: String,
+    pub rt_callsign: String,
+    pub radio_freq: String,
+    pub short_identifier: String,
+    pub full_identifier: String,
+    pub start_squawk: Option<u16>,
+    pub end_squawk: Option<u16>,
+    pub vis_centres: [Option<Position<Valid>>; 4]
 }
+
+

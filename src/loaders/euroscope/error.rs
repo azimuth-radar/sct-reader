@@ -21,7 +21,8 @@ pub enum Error {
     InvalidRegion,
     InvalidLabel,
     InvalidOffset,
-    InvalidFreetext
+    InvalidFreetext,
+    InvalidAtcPosition,
 }
 
 impl Display for Error {
@@ -50,6 +51,7 @@ impl Display for Error {
                 Self::InvalidLabel => "Invalid label",
                 Self::InvalidOffset => "Invalid offset",
                 Self::InvalidFreetext => "Invalid freetext",
+                Self::InvalidAtcPosition => "Invalid ATC position",
             }
         )
     }
