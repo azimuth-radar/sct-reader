@@ -1,7 +1,7 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, hash::Hash};
 
 use aviation_calc_util::{geo::{Bearing, GeoPoint}, units::{Angle, Length}};
-use display::{AtcDisplay, DisplayDefaultConfig, LineStyle};
+use display::{AtcDisplay, AtcDisplayType, DisplayDefaultConfig, LineStyle};
 use geojson::{Feature, FeatureCollection, GeoJson, Geometry, Value};
 use map::AtcMap;
 use serde::{Deserialize, Serialize};
@@ -21,13 +21,15 @@ pub mod symbol;
 pub struct AtcScopePackage {
     pub facilities: Vec<AtcFacility>,
     pub maps: HashMap<String, AtcMap>,
-    pub symbols: HashMap<String, AtcMapSymbol>
+    pub symbols: HashMap<String, AtcMapSymbol>,
+    pub display_types: HashMap<String, AtcDisplayType>
 }
 
 impl TryFrom<EuroScopeResult> for AtcScopePackage {
     fn try_from(value: EuroScopeResult) -> anyhow::Result<Self> {
         let mut maps = HashMap::new();
         let mut symbols = HashMap::new();
+        let mut display_types = HashMap::new();
         let mut new_facility = AtcFacility::default();
         new_facility.name = value.prf_name;
 
@@ -175,16 +177,24 @@ impl TryFrom<EuroScopeResult> for AtcScopePackage {
 
             symbol_icons.insert(ret_icon.symbol_type.to_string(), ret_icon);
         }
+
+        display_types.insert(value.prf_file.to_string(), AtcDisplayType {
+            id: value.prf_file.to_string(),
+            map_defaults,
+            symbol_defaults,
+            symbol_icons
+        });
         
         for asr in value.asrs {
-            let mut disp = AtcDisplay::from_es_asr(value.default_sector_id.to_string(), map_defaults.clone(), symbol_defaults.clone(), symbol_icons.clone(), asr.1);
+            let mut disp = AtcDisplay::from_es_asr(value.default_sector_id.to_string(), value.prf_file.to_string(), asr.1);
             new_facility.displays.push(disp);
         }
 
         Ok(AtcScopePackage {
             facilities: vec![new_facility],
             symbols: symbols,
-            maps: maps
+            maps: maps,
+            display_types
         })
     }
     

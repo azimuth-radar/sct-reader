@@ -80,24 +80,28 @@ pub struct DisplayDefaultConfig {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct AtcDisplayType {
+    pub id: String,
+    pub map_defaults: HashMap<String, DisplayDefaultConfig>,
+    pub symbol_defaults:  HashMap<String, (DisplayDefaultConfig, DisplayDefaultConfig)>,
+    pub symbol_icons: HashMap<String, SymbolIcon>
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct AtcDisplay {
     pub name: String,
     pub center: GeoPoint,
     pub screen_height: Length,
     pub rotation: Angle,
     pub display_items: Vec<AtcDisplayItem>,
-    pub map_defaults: HashMap<String, DisplayDefaultConfig>,
-    pub symbol_defaults:  HashMap<String, (DisplayDefaultConfig, DisplayDefaultConfig)>,
-    pub symbol_icons: HashMap<String, SymbolIcon>
+    pub display_type: String    
 }
 
 impl AtcDisplay {
-    pub fn from_es_asr(default_sector_id: String, map_defaults: HashMap<String, DisplayDefaultConfig>, symbol_defaults: HashMap<String, (DisplayDefaultConfig, DisplayDefaultConfig)>, symbol_icons: HashMap<String, SymbolIcon>, value: EsAsr) -> Self {
+    pub fn from_es_asr(default_sector_id: String, display_type: String, value: EsAsr) -> Self {
         let mut ret_val = AtcDisplay::default();
         ret_val.name = value.name;
-        ret_val.map_defaults = map_defaults;
-        ret_val.symbol_defaults = symbol_defaults;
-        ret_val.symbol_icons = symbol_icons;
+        ret_val.display_type = display_type;
 
         // Center
         let dist = (value.window_area.1 - value.window_area.0) / 2;

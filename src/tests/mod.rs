@@ -28,7 +28,7 @@ fn test_convert_es_path_2(){
 #[test]
 #[ignore]
 fn test_load_es_1(){
-    let prf_path = r#"C:\Users\Caspian\AppData\Roaming\EuroScope\UK\Area\London AC\South Central.prf"#;
+    let prf_path = r#"/Users/pshivaraman/Documents/EuroScope/ZWY_ES_2410/ZWY.prf"#;
     let mut es = EuroScopeLoader::try_new_from_prf(prf_path).unwrap();
     let result = es.try_read().unwrap();
 
