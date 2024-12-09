@@ -1,7 +1,9 @@
-use std::{collections::HashMap, fs::File, io::{BufRead, BufReader}, path::{Path, PathBuf}};
+use std::{collections::HashMap, fs::File, io::{BufRead, BufReader}, path::{Path, PathBuf}, str::FromStr};
 
 use anyhow::Context;
 use directories::UserDirs;
+
+use crate::loaders::ese::{reader::EseReader, Ese};
 
 use super::{colour::Colour, reader::SctReader, sector::Sector, symbology::{SymbologyAttribute, SymbologyInfo, SymbologyItem}, EsAsr};
 
@@ -12,6 +14,7 @@ pub struct EuroScopeResult {
     pub default_sector_id: String,
     pub sectors: HashMap<String, Sector>,
     pub symbology: SymbologyInfo,
+    pub ese: Option<Ese>,
     pub asrs: HashMap<String, EsAsr>
 }
 
@@ -20,6 +23,7 @@ pub struct EuroScopeLoader {
     pub prf_file: String,
     pub symbology_file: String,
     pub sector_file: String,
+    pub ese_file: Option<String>,
     pub asr_files: Vec<(String, String)>
 }
 
@@ -28,6 +32,7 @@ impl EuroScopeLoader {
         // Vars
         let mut symbology_file = "".to_string();
         let mut sector_file = "".to_string();
+        let mut ese_file = None;
         let mut asrs: Vec<(String, String)> = Vec::new();
 
         // Read PRF File
@@ -56,6 +61,14 @@ impl EuroScopeLoader {
                                                 .to_str()
                                                 .unwrap()
                                                 .to_owned();
+                                        ese_file = {
+                                            let ese_file = sector_file.replace(".sct", ".ese");
+                                            if let Ok(true) = std::fs::exists(&ese_file) {
+                                                Some(ese_file)
+                                            } else {
+                                                None
+                                            }
+                                        }
                                     }
                                     &_ => {}
                                 }
@@ -84,6 +97,7 @@ impl EuroScopeLoader {
                 .to_string(),
             symbology_file: symbology_file.to_string(),
             sector_file: sector_file.to_string(),
+            ese_file,
             asr_files: asrs
         })
     }
@@ -101,6 +115,14 @@ impl EuroScopeLoader {
         let sct_result = sct_reader.try_read()?;
         ret_val.default_sector_id = self.sector_file.to_string();
         ret_val.sectors.insert(self.sector_file.to_string(), sct_result);
+
+        // Load ESE, if present
+        if let Some(ese_path) = &self.ese_file {
+            if let Ok(file) = File::open(ese_path) {
+                let reader = EseReader::new(BufReader::new(file));
+                ret_val.ese = reader.try_read().ok();
+            }
+        }
 
         // Load ASRs
         for asr_source in &self.asr_files {

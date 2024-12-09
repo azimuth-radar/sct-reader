@@ -18,7 +18,7 @@ pub struct PartialSectorInfo {
     current_line: usize,
 }
 impl PartialSectorInfo {
-    pub fn parse_line(&mut self, value: &str, position_creator: &PositionCreator) -> SectorResult<()> {
+    pub(crate) fn parse_line(&mut self, value: &str, position_creator: &PositionCreator) -> SectorResult<()> {
         self.current_line += 1;
         //println!("Line {}: |{value}|", self.current_line);
         match self.current_line {
