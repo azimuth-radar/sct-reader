@@ -6,7 +6,7 @@ use geojson::{Feature, FeatureCollection, GeoJson, Geometry, Value};
 use map::AtcMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Map;
-use symbol::AtcMapSymbol;
+use symbol::{AtcMapSymbol, SymbolIcon};
 
 use crate::loaders::euroscope::{colour::Colour, line::{ColouredLine, LineGroup}, loader::EuroScopeResult, sector::{LabelGroup, RegionGroup}, symbology::SymbologyItemType, EsAsr};
 
@@ -131,6 +131,7 @@ impl TryFrom<EuroScopeResult> for AtcScopePackage {
         // Parse ASRs
         let mut map_defaults = HashMap::new();
         let mut symbol_defaults = HashMap::new();
+        let mut symbol_icons = HashMap::new();
 
         for symbol in value.symbology.symbols {
             if matches!(symbol.item_type, SymbologyItemType::Airports | SymbologyItemType::Fixes | SymbologyItemType::Vors | SymbologyItemType::Ndbs) {
@@ -142,13 +143,13 @@ impl TryFrom<EuroScopeResult> for AtcScopePackage {
                         name_cfg.line_style = attr.line_style.into();
                         name_cfg.line_weight = attr.line_weight;
                         name_cfg.size = attr.size;
-                        name_cfg.text_align = attr.text_align;
+                        name_cfg.text_align = attr.text_align.into();
                     } else {
                         symb_cfg.color = attr.color;
                         symb_cfg.line_style = attr.line_style.into();
                         symb_cfg.line_weight = attr.line_weight;
                         symb_cfg.size = attr.size;
-                        symb_cfg.text_align = attr.text_align;
+                        symb_cfg.text_align = attr.text_align.into();
                     }
                 }
                 symbol_defaults.insert(symbol.item_type.to_key_string(), (symb_cfg, name_cfg));
@@ -161,16 +162,22 @@ impl TryFrom<EuroScopeResult> for AtcScopePackage {
                         cfg.line_style = attr.line_style.into();
                         cfg.line_weight = attr.line_weight;
                         cfg.size = attr.size;
-                        cfg.text_align = attr.text_align;
+                        cfg.text_align = attr.text_align.into();
                     }
                 }
 
                 map_defaults.insert(symbol.item_type.to_key_string(), cfg);
             }
         }
+
+        for icon in value.symbology.symbol_icons {
+            let ret_icon = SymbolIcon::try_from_es_symbol_icon(icon.0, icon.1)?;
+
+            symbol_icons.insert(ret_icon.symbol_type.to_string(), ret_icon);
+        }
         
         for asr in value.asrs {
-            let mut disp = AtcDisplay::from_es_asr(value.default_sector_id.to_string(), map_defaults.clone(), symbol_defaults.clone(), asr.1);
+            let mut disp = AtcDisplay::from_es_asr(value.default_sector_id.to_string(), map_defaults.clone(), symbol_defaults.clone(), symbol_icons.clone(), asr.1);
             new_facility.displays.push(disp);
         }
 

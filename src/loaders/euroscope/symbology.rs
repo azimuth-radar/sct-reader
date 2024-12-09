@@ -112,6 +112,7 @@ pub struct SymbologyAttribute {
 pub struct SymbologyInfo {
     pub file_name: String,
     pub symbols: Vec<SymbologyItem>,
+    pub symbol_icons: Vec<(u8, Vec<String>)>,
     pub clipping_area: u8
 }
 
@@ -120,6 +121,7 @@ impl SymbologyInfo {
         let file_reader = BufReader::new(File::open(&symbology_file)?);
         let mut clip_area = 5_u8;
         let mut symbols: HashMap<String, SymbologyItem> = HashMap::new();
+        let mut symbol_icons_defs = Vec::new();
 
         for line in file_reader.lines() {
             if let Ok(line_str) = line {
@@ -128,6 +130,12 @@ impl SymbologyInfo {
                 if items.len() > 0 {
                     match items[0].to_lowercase().as_str() {
                         "m_cliparea" => clip_area = items[1].parse()?,
+                        "symbol" => symbol_icons_defs.push((items[1].parse::<u8>()?, Vec::new())),
+                        "symbolitem" => {
+                            if let Some(symb) = symbol_icons_defs.last_mut() {
+                                symb.1.push(items[1].to_string());
+                            }
+                        },
                         &_ => {
                             if let Ok(symbol_type) = items[0].try_into() {
                                 // Create Symbol Def
@@ -159,7 +167,8 @@ impl SymbologyInfo {
         Ok(SymbologyInfo {
             file_name: symbology_file.as_ref().to_str().unwrap().to_string(),
             clipping_area: clip_area,
-            symbols: symbols.values().cloned().collect()
+            symbols: symbols.values().cloned().collect(),
+            symbol_icons: symbol_icons_defs
         })
     }
 }

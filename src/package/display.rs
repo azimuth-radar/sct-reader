@@ -7,6 +7,8 @@ use serde_json::Map;
 
 use crate::loaders::euroscope::{colour::Colour, line::{ColouredLine, LineGroup}, sector::RegionGroup, symbology::SymbologyItemType, EsAsr};
 
+use super::symbol::SymbolIcon;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum AtcDisplayItem {
     Map{id: String},
@@ -37,13 +39,44 @@ impl From<u8> for LineStyle {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[repr(u8)]
+pub enum TextAlign {
+    #[default]
+    TopLeft = 0,
+    CenterLeft = 1,
+    BottomLeft = 2,
+    TopCenter = 3,
+    CenterCenter = 4,
+    BottomCenter = 5,
+    TopRight = 6,
+    CenterRight = 7,
+    BottomRight = 8
+}
+
+impl From<u8> for TextAlign {
+    fn from(value: u8) -> Self {
+        match value {
+            1 => Self::CenterRight,
+            2 => Self::BottomLeft,
+            3 => Self::TopCenter,
+            4 => Self::CenterCenter,
+            5 => Self::BottomCenter,
+            6 => Self::TopRight,
+            7 => Self::CenterRight,
+            8 => Self::BottomRight,
+            _ => Self::TopLeft
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct DisplayDefaultConfig {
     pub color: Colour,
     pub size: f32,
     pub line_weight: u8,
     pub line_style: LineStyle,
-    pub text_align: u8,
+    pub text_align: TextAlign,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -55,14 +88,16 @@ pub struct AtcDisplay {
     pub display_items: Vec<AtcDisplayItem>,
     pub map_defaults: HashMap<String, DisplayDefaultConfig>,
     pub symbol_defaults:  HashMap<String, (DisplayDefaultConfig, DisplayDefaultConfig)>,
+    pub symbol_icons: HashMap<String, SymbolIcon>
 }
 
 impl AtcDisplay {
-    pub fn from_es_asr(default_sector_id: String, map_defaults: HashMap<String, DisplayDefaultConfig>, symbol_defaults: HashMap<String, (DisplayDefaultConfig, DisplayDefaultConfig)>, value: EsAsr) -> Self {
+    pub fn from_es_asr(default_sector_id: String, map_defaults: HashMap<String, DisplayDefaultConfig>, symbol_defaults: HashMap<String, (DisplayDefaultConfig, DisplayDefaultConfig)>, symbol_icons: HashMap<String, SymbolIcon>, value: EsAsr) -> Self {
         let mut ret_val = AtcDisplay::default();
         ret_val.name = value.name;
         ret_val.map_defaults = map_defaults;
         ret_val.symbol_defaults = symbol_defaults;
+        ret_val.symbol_icons = symbol_icons;
 
         // Center
         let dist = (value.window_area.1 - value.window_area.0) / 2;
