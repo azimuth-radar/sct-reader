@@ -1,6 +1,6 @@
 use std::{fmt::Display, marker::PhantomData};
 
-use crate::{error::Error, SectorResult};
+use super::{error::Error, SectorResult};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Position<Status = MaybeValid> {

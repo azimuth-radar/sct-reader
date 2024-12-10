@@ -1,1 +1,7 @@
+# Cargo
 /target
+
+# IDE Folders
+.idea/
+.vs/
+.vscode/

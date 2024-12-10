@@ -5,7 +5,7 @@ use std::{
     time::Instant,
 };
 
-use crate::{
+use super::{
     colour::Colour,
     error::Error,
     partial::{ArtccOrAirwayLineType, BeaconType, PartialSector, SidStarType},
@@ -49,6 +49,9 @@ impl<R: BufRead> SctReader<R> {
                         Err(e) => self.errors.push((line_number + 1, line.to_owned(), e)),
                     }
                     continue;
+                }
+                if line.starts_with("OFFSET") {
+                    
                 }
                 if line.starts_with("#define") {
                     self.current_section = FileSection::ColourDefinitions;
@@ -148,6 +151,7 @@ fn parse_file_section(value: &str) -> SectorResult<FileSection> {
 }
 
 #[test]
+#[ignore]
 fn test() {
     let file =
         File::open(r#"C:\Users\chpme\AppData\Roaming\EuroScope\UK\Data\Sector\UK_2023_11.sct"#)

@@ -1,6 +1,6 @@
 use std::{collections::HashMap, str::FromStr};
 
-use crate::{
+use super::{
     colour::Colour,
     error::Error,
     line::{ColouredLine, LineGroup},
@@ -19,6 +19,22 @@ pub mod region;
 pub mod sector_info;
 
 #[derive(Debug, Default)]
+pub(crate) struct PositionCreator {
+    offset: [f64; 2],
+}
+impl PositionCreator {
+    pub fn try_new_from_es(&self, lat: &str, lon: &str) -> SectorResult<Position> {
+        Position::try_new_from_es(lat, lon).map(|pos| Position::new(pos.lat + self.offset[1], pos.lon + self.offset[0]))
+    }
+    pub fn set_offset(&mut self, x_offset: f64, y_offset: f64) {
+        self.offset = [x_offset, y_offset];
+    }
+    pub fn offset(&self) -> (f64, f64) {
+        (self.offset[0], self.offset[1])
+    }
+}
+
+#[derive(Debug, Default)]
 pub struct PartialSector {
     pub colours: HashMap<String, Colour>,
     pub sector_info: PartialSectorInfo,
@@ -34,9 +50,9 @@ pub struct PartialSector {
     pub sid_entries: Vec<LineGroup<ColouredLine>>,
     pub star_entries: Vec<LineGroup<ColouredLine>>,
     pub geo_entries: Vec<LineGroup<ColouredLine>>,
-    pub regions: Vec<PartialRegionGroup>,
+    pub region_groups: Vec<PartialRegionGroup>,
     pub labels: Vec<LabelGroup>,
-
+    position_creator: PositionCreator,
     current_region_name: String,
 }
 
@@ -56,7 +72,7 @@ impl PartialSector {
         self.colours.get(&value.to_lowercase()).map(|x| *x)
     }
     fn try_fetch_or_decode_lat_lon(&self, lat: &str, lon: &str) -> Option<Position> {
-        if let Ok(position) = Position::try_new_from_es(lat, lon) {
+        if let Ok(position) = self.position_creator.try_new_from_es(lat, lon) {
             return Some(position.into());
         }
 
@@ -84,6 +100,26 @@ impl PartialSector {
         return None;
     }
 
+    pub fn parse_offset(&mut self, value: &str) -> SectorResult<()> {
+        let sections = value.split_whitespace().collect::<Vec<_>>();
+        if sections.len() == 3 {
+            let y_offset: f64 = sections[1].parse().map_err(|_| Error::InvalidOffset)?;
+            let x_offset: f64 = sections[2].parse().map_err(|_| Error::InvalidOffset)?;
+            self.position_creator.set_offset(x_offset, y_offset);
+            return Ok(());
+        }
+        else if sections.len() == 5 {
+            let pos_1 = self.position_creator.try_new_from_es(sections[1], sections[2])?;
+            let pos_2 = self.position_creator.try_new_from_es(sections[3], sections[4])?;
+            let x_offset = pos_2.lon - pos_1.lon;
+            let y_offset = pos_2.lat - pos_1.lat;
+            self.position_creator.set_offset(x_offset, y_offset);
+            return Ok(());
+        }
+
+        return Err(Error::InvalidOffset);
+    }
+
     pub fn parse_colour_line(&mut self, value: &str) -> SectorResult<()> {
         let mut sections = value.split_whitespace();
         let colour_name = sections
@@ -96,7 +132,7 @@ impl PartialSector {
         Ok(())
     }
     pub fn parse_sector_info_line(&mut self, value: &str) -> SectorResult<()> {
-        self.sector_info.parse_line(value)
+        self.sector_info.parse_line(value, &self.position_creator)
     }
     pub fn parse_airport_line(&mut self, value: &str) -> SectorResult<()> {
         let mut sections = value.split_whitespace();
@@ -104,7 +140,7 @@ impl PartialSector {
         let tower_frequency = sections.next().ok_or(Error::InvalidWaypoint)?.to_owned();
         let lat = sections.next().ok_or(Error::InvalidWaypoint)?;
         let lon = sections.next().ok_or(Error::InvalidWaypoint)?;
-        let position = Position::try_new_from_es(lat, lon)?.validate()?;
+        let position = self.position_creator.try_new_from_es(lat, lon)?.validate()?;
         let airspace_class: AirspaceClass =
             sections.next().ok_or(Error::InvalidWaypoint)?.parse()?;
 
@@ -149,8 +185,8 @@ impl PartialSector {
         let lat_b = sections.next().ok_or(Error::InvalidRunway)?;
         let lon_b = sections.next().ok_or(Error::InvalidRunway)?;
 
-        let pos_a = Position::try_new_from_es(lat_a, lon_a)?.validate()?;
-        let pos_b = Position::try_new_from_es(lat_b, lon_b)?.validate()?;
+        let pos_a = self.position_creator.try_new_from_es(lat_a, lon_a)?.validate()?;
+        let pos_b = self.position_creator.try_new_from_es(lat_b, lon_b)?.validate()?;
 
         let airport = sections.next().ok_or(Error::InvalidRunway)?;
         let airport = self
@@ -198,7 +234,7 @@ impl PartialSector {
         let frequency = sections.next().ok_or(Error::InvalidVorOrNdb)?.to_owned();
         let lat = sections.next().ok_or(Error::InvalidVorOrNdb)?;
         let lon = sections.next().ok_or(Error::InvalidVorOrNdb)?;
-        let position = Position::try_new_from_es(lat, lon)?.validate()?;
+        let position = self.position_creator.try_new_from_es(lat, lon)?.validate()?;
 
         match beacon_type {
             BeaconType::Ndb => {
@@ -226,7 +262,7 @@ impl PartialSector {
         let identifier = sections.next().ok_or(Error::InvalidFix)?.to_owned();
         let lat = sections.next().ok_or(Error::InvalidFix)?;
         let lon = sections.next().ok_or(Error::InvalidFix)?;
-        let position = Position::try_new_from_es(lat, lon)?.validate()?;
+        let position = self.position_creator.try_new_from_es(lat, lon)?.validate()?;
         let fix = Fix {
             identifier,
             position,
@@ -321,41 +357,47 @@ impl PartialSector {
         value: &str,
         sid_star_type: SidStarType,
     ) -> SectorResult<()> {
-        let name = value.get(0..26).ok_or(Error::InvalidSidStarEntry)?.trim();
-        let mut sections = value
-            .get(26..)
-            .ok_or(Error::InvalidSidStarEntry)?
-            .trim()
-            .split_whitespace();
-        let lat_a = sections.next().ok_or(Error::InvalidSidStarEntry)?;
-        let lon_a = sections.next().ok_or(Error::InvalidSidStarEntry)?;
-        let lat_b = sections.next().ok_or(Error::InvalidSidStarEntry)?;
-        let lon_b = sections.next().ok_or(Error::InvalidSidStarEntry)?;
-        let colour = sections
-            .next()
-            .and_then(|x| self.try_fetch_or_decode_colour(x));
+        let sections = value.trim().split_whitespace().collect::<Vec<_>>();
+        let (first_coord_index, colour) = match sections.len() {
+            0..4 => return Err(Error::InvalidSidStarEntry),
+            4 => (0, None),
+            _ => if let Some(colour) = self.try_fetch_or_decode_colour(sections.last().unwrap()) {
+                (sections.len() - 5, Some(colour))
+            } else {
+                (sections.len() - 4, None)
+            }
+        };
+
+        let name = if first_coord_index > 0 {
+            Some(sections[0..first_coord_index].join(" "))
+        } else {
+            None
+        };
+
         let line = self
-            .try_fetch_or_decode_lat_lon(lat_a, lon_a)
+            .try_fetch_or_decode_lat_lon(sections[first_coord_index], sections[first_coord_index + 1])
             .and_then(|pos| pos.validate().ok())
             .and_then(|start_pos| {
-                self.try_fetch_or_decode_lat_lon(lat_b, lon_b)
+                self.try_fetch_or_decode_lat_lon(sections[first_coord_index + 2], sections[first_coord_index + 3])
                     .and_then(|pos| pos.validate().ok())
                     .and_then(|end_pos| Some(ColouredLine::new(start_pos, end_pos, colour)))
             });
+
+
 
         let vec = match sid_star_type {
             SidStarType::Sid => &mut self.sid_entries,
             SidStarType::Star => &mut self.star_entries,
         };
 
-        if name.is_empty() {
+        if name.is_none() {
             let in_progress_entry = vec.last_mut().ok_or(Error::InvalidSidStarEntry)?;
             if let Some(line) = line {
                 in_progress_entry.lines.push(line);
             }
         } else {
             let new_entry = LineGroup::new(
-                name.to_owned(),
+                name.unwrap(),
                 if let Some(line) = line {
                     vec![line]
                 } else {
@@ -464,7 +506,7 @@ impl PartialSector {
                 .try_fetch_or_decode_colour(sections[0])
                 .ok_or(Error::InvalidRegion)?;
             if let Some(region_group) = self
-                .regions
+                .region_groups
                 .iter_mut()
                 .find(|region_group| region_group.name == self.current_region_name)
             {
@@ -473,9 +515,14 @@ impl PartialSector {
                     vertices: vec![],
                 });
             } else {
-                self.regions.push(PartialRegionGroup {
+                self.region_groups.push(PartialRegionGroup {
                     name: self.current_region_name.clone(),
-                    regions: vec![],
+                    regions: vec![
+                        PartialRegion {
+                            colour: Some(colour),
+                            vertices: vec![],
+                        }
+                    ],
                 });
             }
         }
@@ -486,7 +533,7 @@ impl PartialSector {
             .map(|pos| pos.validate().ok())
             .flatten()
         {
-            self.regions
+            self.region_groups
                 .iter_mut()
                 .find(|region_group| region_group.name == self.current_region_name)
                 .ok_or(Error::InvalidRegion)?
@@ -509,7 +556,7 @@ impl PartialSector {
             .try_fetch_or_decode_colour(sections[sections.len() - 1])
             .ok_or(Error::InvalidLabel)?;
         let position =
-            Position::try_new_from_es(sections[sections.len() - 3], sections[sections.len() - 2])
+        self.position_creator.try_new_from_es(sections[sections.len() - 3], sections[sections.len() - 2])
                 .and_then(|position| position.validate())?;
         let name = sections[0..sections.len() - 3].join(" ");
         let name = name.trim_matches('"');
@@ -523,7 +570,7 @@ impl PartialSector {
     }
 }
 
-fn parse_runway_identifier(value: &str) -> SectorResult<(u8, RunwayModifier)> {
+pub(crate) fn parse_runway_identifier(value: &str) -> SectorResult<(u8, RunwayModifier)> {
     let modifier = if value.ends_with('L') {
         RunwayModifier::Left
     } else if value.ends_with('C') {

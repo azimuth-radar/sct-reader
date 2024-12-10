@@ -1,8 +1,10 @@
 use std::str::FromStr;
 
-use crate::error::Error;
+use serde::{Deserialize, Serialize};
 
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+use super::error::Error;
+
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Colour {
     pub r: u8,
     pub g: u8,

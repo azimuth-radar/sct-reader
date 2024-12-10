@@ -1,7 +1,5 @@
-use crate::{
-    colour::Colour,
-    position::{Position, Valid},
-};
+use crate::loaders::euroscope::{colour::Colour, position::{Position, Valid}};
+
 
 #[derive(Debug)]
 pub struct PartialRegionGroup {

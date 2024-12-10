@@ -1,7 +1,5 @@
-use crate::{
-    colour::Colour,
-    position::{Position, Valid},
-};
+use super::{colour::Colour, position::{Position, Valid}};
+
 
 pub trait Line {
     fn start(&self) -> Position<Valid>;
