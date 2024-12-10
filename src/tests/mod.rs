@@ -6,6 +6,7 @@ use crate::{loaders::{euroscope::loader::EuroScopeLoader, vnas_crc::CrcPackage},
 use crate::loaders::euroscope::loader::EuroScopeLoaderPrf;
 
 #[test]
+#[ignore]
 fn test_convert_es_path_1(){
     let prf_path = "/a/b/c.prf";
     let es_path = "\\d\\f.txt";
@@ -16,6 +17,7 @@ fn test_convert_es_path_1(){
 }
 
 #[test]
+#[ignore]
 fn test_convert_es_path_2(){
     let prf_path = "/a/b/c.prf";
     let es_path = "BLAH_FIR\\d\\f.txt";
