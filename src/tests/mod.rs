@@ -3,7 +3,7 @@ use std::{fs::File, io::BufWriter, path::Path};
 use directories::UserDirs;
 
 use crate::{loaders::{euroscope::loader::EuroScopeLoader, vnas_crc::CrcPackage}, package::AtcScopePackage};
-
+use crate::loaders::euroscope::loader::EuroScopeLoaderPrf;
 
 #[test]
 fn test_convert_es_path_1(){
@@ -29,7 +29,9 @@ fn test_convert_es_path_2(){
 #[ignore]
 fn test_load_es_1(){
     let prf_path = r#"/Users/pshivaraman/Documents/EuroScope/UK/Belfast/Belfast Combined.prf"#;
-    let mut es = EuroScopeLoader::try_new_from_prf(prf_path).unwrap();
+    let mut es = EuroScopeLoader {
+        prfs: vec![EuroScopeLoaderPrf::try_new_from_prf(prf_path).unwrap()]
+    };
     let result = es.try_read().unwrap();
 
     let package = AtcScopePackage::try_from(result).unwrap();
@@ -42,9 +44,26 @@ fn test_load_es_1(){
 
 #[test]
 #[ignore]
+fn test_load_es_2(){
+    let prf_path = r#"/Users/pshivaraman/Documents/EuroScope/UK"#;
+
+    let mut es = EuroScopeLoader::try_new_from_dir(prf_path).unwrap();
+    let result = es.try_read().unwrap();
+
+    let package = AtcScopePackage::try_from(result).unwrap();
+
+    serde_json::to_writer(BufWriter::new(File::create(Path::new("target").join("test_es_all_out.json")).unwrap()), &package);
+}
+
+#[test]
+#[ignore]
 fn test_load_crc_1() {
     let crc_path = r#"/Users/pshivaraman/Downloads/CRC/ARTCCs/ZNY.json"#;
-    let package = CrcPackage::try_new_from_file(crc_path).unwrap();
+    let crc_package = CrcPackage::try_new_from_file(crc_path).unwrap();
 
-    println!("{:#?}", package);
+    let package = AtcScopePackage::try_from(&crc_package).unwrap();
+
+    serde_json::to_writer(BufWriter::new(File::create(Path::new("target").join("test_crc_out.json")).unwrap()), &package);
+
+    //println!("{:#?}", package);
 }

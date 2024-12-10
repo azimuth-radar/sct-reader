@@ -23,21 +23,21 @@ pub struct EramConfig {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EramGeoMap {
-    id: String,
-    name: String,
-    label_line_1: String,
-    label_line_2: String,
-    filter_menu: Vec<EramFilterMenu>,
-    bcg_menu: Vec<String>,
-    video_map_ids: Vec<String>
+    pub id: String,
+    pub name: String,
+    pub label_line_1: String,
+    pub label_line_2: String,
+    pub filter_menu: Vec<EramFilterMenu>,
+    pub bcg_menu: Vec<String>,
+    pub video_map_ids: Vec<String>
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EramFilterMenu {
-    id: String,
-    label_line_1: String,
-    label_line_2: String
+    pub id: String,
+    pub label_line_1: String,
+    pub label_line_2: String
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

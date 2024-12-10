@@ -1,2 +1,7 @@
+# Cargo
 /target
-test.json
+
+# IDE Folders
+.idea/
+.vs/
+.vscode/

@@ -1,5 +1,5 @@
 use std::{collections::HashMap, fs::File, io::{BufRead, BufReader}, path::{Path, PathBuf}, str::FromStr};
-
+use std::fs::read_dir;
 use anyhow::Context;
 use directories::UserDirs;
 
@@ -8,25 +8,35 @@ use crate::loaders::ese::{self, reader::EseReader, Ese};
 use super::{colour::Colour, reader::SctReader, sector::Sector, symbology::{SymbologyAttribute, SymbologyInfo, SymbologyItem}, EsAsr};
 
 #[derive(Debug, Default)]
-pub struct EuroScopeResult {
+pub struct EuroScopeResultProfile {
     pub prf_name: String,
     pub prf_file: String,
     pub default_sector_id: String,
-    pub sectors: HashMap<String, (Sector, Option<Ese>)>,
     pub symbology: SymbologyInfo,
     pub asrs: HashMap<String, EsAsr>
 }
 
+#[derive(Debug, Default)]
+pub struct EuroScopeResult {
+    pub profiles: Vec<EuroScopeResultProfile>,
+    pub sectors: HashMap<String, (Sector, Option<Ese>)>,
+}
+
 #[derive(Debug)]
 pub struct EuroScopeLoader {
+    pub prfs: Vec<EuroScopeLoaderPrf>
+}
+
+#[derive(Debug)]
+pub struct EuroScopeLoaderPrf {
     pub prf_file: String,
     pub symbology_file: String,
     pub sector_file: String,
     pub asr_files: Vec<(String, String)>
 }
 
-impl EuroScopeLoader {
-    pub fn try_new_from_prf(prf_file: impl AsRef<Path>) -> anyhow::Result<EuroScopeLoader> {
+impl EuroScopeLoaderPrf {
+    pub fn try_new_from_prf(prf_file: impl AsRef<Path>) -> anyhow::Result<EuroScopeLoaderPrf> {
         // Vars
         let mut symbology_file = "".to_string();
         let mut sector_file = "".to_string();
@@ -45,7 +55,7 @@ impl EuroScopeLoader {
                                 match items[1].to_lowercase().as_str() {
                                     "settingsfilesymbology" => {
                                         symbology_file =
-                                            Self::try_convert_es_path(&prf_file, items[2])?
+                                            EuroScopeLoader::try_convert_es_path(&prf_file, items[2])?
                                                 .canonicalize()?
                                                 .to_str()
                                                 .unwrap()
@@ -53,7 +63,7 @@ impl EuroScopeLoader {
                                     }
                                     "sector" => {
                                         sector_file =
-                                            Self::try_convert_es_path(&prf_file, items[2])?
+                                            EuroScopeLoader::try_convert_es_path(&prf_file, items[2])?
                                                 .canonicalize()?
                                                 .to_str()
                                                 .unwrap()
@@ -63,21 +73,22 @@ impl EuroScopeLoader {
                                 }
                             }
                         }
-                        "asrfastkeys" => asrs.push((
-                            items[1].to_owned(),
-                            Self::try_convert_es_path(&prf_file, items[2])?
-                                .canonicalize()?
-                                .to_str()
-                                .unwrap()
-                                .to_owned(),
-                        )),
+                        "asrfastkeys" => {
+                            let asr_path = EuroScopeLoader::try_convert_es_path(&prf_file, items[2]);
+                            if let Ok(asr_path_res) = asr_path {
+                                let canon_path = asr_path_res.canonicalize();
+                                if let Ok(canon_res) = canon_path {
+                                    asrs.push((items[1].to_owned(), canon_res.to_str().unwrap().to_owned()));
+                                }
+                            }
+                        },
                         &_ => {}
                     }
                 }
             }
         }
 
-        Ok(EuroScopeLoader {
+        Ok(EuroScopeLoaderPrf {
             prf_file: prf_file
                 .as_ref()
                 .canonicalize()?
@@ -89,66 +100,96 @@ impl EuroScopeLoader {
             asr_files: asrs
         })
     }
+}
+
+impl EuroScopeLoader {
+    pub fn try_new_from_dir(package_dir: impl AsRef<Path>) -> anyhow::Result<EuroScopeLoader> {
+        let mut results = Vec::new();
+        if package_dir.as_ref().is_dir() {
+            for entry in read_dir(package_dir)? {
+                let entry = entry?;
+                let path = entry.path();
+                if path.is_dir() {
+                    results.append(&mut Self::try_new_from_dir(&path)?.prfs);
+                } else if entry.file_name().to_str().unwrap().contains(".prf"){
+                    results.push(EuroScopeLoaderPrf::try_new_from_prf(&path)?);
+                }
+            }
+        }
+
+        Ok(EuroScopeLoader {
+            prfs: results
+        })
+    }
 
     pub fn try_read(&mut self) -> anyhow::Result<EuroScopeResult> {
         let mut ret_val = EuroScopeResult::default();
-        ret_val.prf_file = self.prf_file.to_string();
-        ret_val.prf_name = Path::new(&self.prf_file).file_stem().unwrap_or_default().to_str().unwrap().to_string();
 
-        // Load symbology
-        ret_val.symbology = SymbologyInfo::try_from_file(&self.symbology_file)?;
+        for prf in &self.prfs {
+            let mut res_prf = EuroScopeResultProfile::default();
 
-        // Load Main Sector File
-        let sct_reader = SctReader::new(BufReader::new(File::open(&self.sector_file)?));
-        let sct_result = sct_reader.try_read()?;
-        let ese_file = self.sector_file.replace(".sct", ".ese");
-        let sct_ese_result = match std::fs::exists(&ese_file) {
-            Ok(true) => {
-                if let Ok(file) = File::open(&ese_file) {
-                    let reader = EseReader::new(BufReader::new(file));
-                    reader.try_read().ok()
-                } else{
-                    None
-                }
-            },
-            _ => None
-        };
+            res_prf.prf_file = prf.prf_file.to_string();
+            res_prf.prf_name = Path::new(&prf.prf_file).file_stem().unwrap_or_default().to_str().unwrap().to_string();
 
-        ret_val.default_sector_id = self.sector_file.to_string();
-        ret_val.sectors.insert(self.sector_file.to_string(), (sct_result, sct_ese_result));
+            // Load symbology
+            res_prf.symbology = SymbologyInfo::try_from_file(&prf.symbology_file)?;
 
-        // Load ASRs
-        for asr_source in &self.asr_files {
-            let mut asr = EsAsr::try_from_asr_file(&asr_source.1)?;
-            if !asr.1.is_empty() {
-                let asr_sector_path = Self::try_convert_es_path(&self.prf_file, &asr.1)?.canonicalize()?.to_str().unwrap().to_owned();
-                if !ret_val.sectors.contains_key(&asr_sector_path) {
-                    let asr_sct_reader = SctReader::new(BufReader::new(File::open(&asr_sector_path)?));
-                    let asr_sct_result = asr_sct_reader.try_read()?;
+            res_prf.default_sector_id = prf.sector_file.to_string();
 
-                    let asr_ese_file = asr_sector_path.replace(".sct", ".ese");
-                    let asr_sct_ese_result = match std::fs::exists(&asr_ese_file) {
-                        Ok(true) => {
-                            if let Ok(file) = File::open(&ese_file) {
-                                let reader = EseReader::new(BufReader::new(file));
-                                reader.try_read().ok()
-                            } else {
-                                None 
-                            }
-                        },
-                        _ => None
-                    };
-                    ret_val.sectors.insert(asr_sector_path.to_string(), (asr_sct_result, asr_sct_ese_result));
-                }
-    
-                asr.0.sector_file_id = Some(asr_sector_path.to_string());
-            } else {
-                asr.0.sector_file_id = Some(ret_val.default_sector_id.clone());
+            // Load Main Sector File
+            if (!ret_val.sectors.contains_key(&prf.sector_file)){
+                let sct_reader = SctReader::new(BufReader::new(File::open(&prf.sector_file)?));
+                let sct_result = sct_reader.try_read()?;
+                let ese_file = prf.sector_file.replace(".sct", ".ese");
+                let sct_ese_result = match std::fs::exists(&ese_file) {
+                    Ok(true) => {
+                        if let Ok(file) = File::open(&ese_file) {
+                            let reader = EseReader::new(BufReader::new(file));
+                            reader.try_read().ok()
+                        } else{
+                            None
+                        }
+                    },
+                    _ => None
+                };
+
+                ret_val.sectors.insert(prf.sector_file.to_string(), (sct_result, sct_ese_result));
             }
-            asr.0.name = Path::new(&asr_source.1).file_stem().unwrap_or_default().to_str().unwrap().to_string();
 
+            // Load ASRs
+            for asr_source in &prf.asr_files {
+                let mut asr = EsAsr::try_from_asr_file(&asr_source.1)?;
+                if !asr.1.is_empty() {
+                    let asr_sector_path = Self::try_convert_es_path(&prf.prf_file, &asr.1)?.canonicalize()?.to_str().unwrap().to_owned();
+                    if !ret_val.sectors.contains_key(&asr_sector_path) {
+                        let asr_sct_reader = SctReader::new(BufReader::new(File::open(&asr_sector_path)?));
+                        let asr_sct_result = asr_sct_reader.try_read()?;
 
-            ret_val.asrs.insert(asr_source.0.to_string(), asr.0);
+                        let asr_ese_file = asr_sector_path.replace(".sct", ".ese");
+                        let asr_sct_ese_result = match std::fs::exists(&asr_ese_file) {
+                            Ok(true) => {
+                                if let Ok(file) = File::open(&asr_ese_file) {
+                                    let reader = EseReader::new(BufReader::new(file));
+                                    reader.try_read().ok()
+                                } else {
+                                    None
+                                }
+                            },
+                            _ => None
+                        };
+                        ret_val.sectors.insert(asr_sector_path.to_string(), (asr_sct_result, asr_sct_ese_result));
+                    }
+
+                    asr.0.sector_file_id = Some(asr_sector_path.to_string());
+                } else {
+                    asr.0.sector_file_id = Some(res_prf.default_sector_id.clone());
+                }
+                asr.0.name = Path::new(&asr_source.1).file_stem().unwrap_or_default().to_str().unwrap().to_string();
+
+                res_prf.asrs.insert(asr_source.0.to_string(), asr.0);
+            }
+
+            ret_val.profiles.push(res_prf);
         }
 
         Ok(ret_val)
@@ -183,8 +224,7 @@ impl EuroScopeLoader {
 
         if path.exists() {
             return Ok(path);
-        } 
-        
+        }
 
         Ok(UserDirs::new()
             .context("Failed to get User Directories")?

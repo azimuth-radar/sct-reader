@@ -1,12 +1,16 @@
 use std::collections::HashMap;
-
+use std::ops::Deref;
 use aviation_calc_util::{geo::{Bearing, GeoPoint}, units::{Angle, Length}};
 use geojson::{Feature, FeatureCollection, Geometry, Value};
 use serde::{Deserialize, Serialize};
 use serde_json::Map;
 
 use crate::loaders::euroscope::{colour::Colour, line::{ColouredLine, LineGroup}, sector::RegionGroup, symbology::{self, SymbologyInfo, SymbologyItemType}, EsAsr};
-
+use crate::loaders::euroscope::partial::SidStarType::Star;
+use crate::loaders::vnas_crc::CrcVideoMapRef;
+use crate::loaders::vnas_crc::eram::EramConfig;
+use crate::loaders::vnas_crc::stars::{StarsArea, StarsConfiguration};
+use crate::loaders::vnas_crc::tower::TowerCabConfig;
 use super::symbol::SymbolIcon;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -164,7 +168,7 @@ impl AtcDisplay {
         // Center
         let dist = (value.window_area.1 - value.window_area.0) / 2;
         let bearing = GeoPoint::initial_bearing(&value.window_area.0, &value.window_area.1);
-        let mut center = value.window_area.1.clone();
+        let mut center = value.window_area.0.clone();
         center.move_by(bearing, dist);
         ret_val.center = center;
 
@@ -220,5 +224,85 @@ impl AtcDisplay {
         ret_val.display_items = items;
 
         ret_val
+    }
+
+    pub fn from_crc_twr_asdex(display_type: String, display_name: String, twr_cfg: &TowerCabConfig) -> AtcDisplay {
+        AtcDisplay {
+            name: display_name.to_string(),
+            display_type: display_type.to_string(),
+            center: twr_cfg.tower_location.unwrap_or_default(),
+            screen_height: Length::from_nautical_miles(twr_cfg.default_zoom_range.into()),
+            rotation: Angle::from_degrees(twr_cfg.default_rotation.into()),
+            display_items: vec![AtcDisplayItem::Map {id: twr_cfg.video_map_id.to_string()}]
+        }
+    }
+
+    fn get_tdm_maps_from_crc(video_map_ids: &Vec<String>, map_refs: &HashMap<String, CrcVideoMapRef>) -> (Vec<AtcDisplayItem>, Vec<AtcDisplayItem>) {
+        let mut display_items = Vec::new();
+        let mut display_items_tdm = Vec::new();
+
+        for video_map_id in video_map_ids {
+            display_items_tdm.push(AtcDisplayItem::Map {id: video_map_id.to_string()});
+
+            // Check for TDM
+            if let Some(map_ref) = map_refs.get(video_map_id) {
+                if !map_ref.tdm_only {
+                    display_items.push(AtcDisplayItem::Map {id: video_map_id.to_string()});
+                }
+            }
+        }
+
+        (display_items, display_items_tdm)
+    }
+
+    pub fn from_crc_stars(stars_cfg: &StarsConfiguration, map_refs: &HashMap<String, CrcVideoMapRef>) -> Vec<AtcDisplay> {
+        let default_area = StarsArea::default();
+        let area = stars_cfg.areas.get(0).unwrap_or(&default_area);
+        let display_items = Self::get_tdm_maps_from_crc(&stars_cfg.video_map_ids, map_refs);
+
+        vec![
+            AtcDisplay {
+                name: "STARS".to_string(),
+                display_type: "stars".to_string(),
+                center: area.visibility_center,
+                screen_height: Length::from_nautical_miles(area.surveillance_range.into()),
+                rotation: Angle::from_radians(0_f64),
+                display_items: display_items.0
+            },
+            AtcDisplay {
+                name: "STARS (Top Down Mode)".to_string(),
+                display_type: "stars".to_string(),
+                center: area.visibility_center,
+                screen_height: Length::from_nautical_miles(area.surveillance_range.into()),
+                rotation: Angle::from_radians(0_f64),
+                display_items: display_items.1
+            }
+        ]
+    }
+
+    pub fn from_crc_eram(eram_cfg: &EramConfig, map_refs: &HashMap<String, CrcVideoMapRef>) -> Vec<AtcDisplay> {
+        let mut displays = Vec::new();
+        for geo_map in &eram_cfg.geo_maps {
+            let display_items = Self::get_tdm_maps_from_crc(&geo_map.video_map_ids, map_refs);
+
+            displays.push(AtcDisplay {
+                name: format!("ERAM {}", geo_map.name),
+                display_type: "eram".to_string(),
+                center: GeoPoint::default(),
+                screen_height: Length::from_nautical_miles(150_f64),
+                rotation: Angle::from_radians(0_f64),
+                display_items: display_items.0
+            });
+            displays.push(AtcDisplay {
+                name: format!("ERAM {} (Top Down Mode)", geo_map.name),
+                display_type: "eram".to_string(),
+                center: GeoPoint::default(),
+                screen_height: Length::from_nautical_miles(150_f64),
+                rotation: Angle::from_radians(0_f64),
+                display_items: display_items.1
+            });
+        }
+
+        displays
     }
 }

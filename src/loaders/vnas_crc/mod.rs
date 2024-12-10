@@ -38,6 +38,8 @@ pub struct CrcTranceiver {
 #[serde(rename_all = "camelCase")]
 pub struct CrcPackage {
     pub id: String,
+    #[serde(skip)]
+    pub file_path: String,
     pub video_maps: Vec<CrcVideoMapRef>,
     pub transceivers: Vec<CrcTranceiver>,
     pub visibility_centers: Vec<GeoPoint>,
@@ -46,7 +48,9 @@ pub struct CrcPackage {
 
 impl CrcPackage {
     pub fn try_new_from_file(file: impl AsRef<Path>) -> anyhow::Result<Self> {
-        let package: CrcPackage = serde_json::from_reader::<File, CrcPackage>(File::open(file)?).context("Invalid CRC Json")?;
+        let mut package: CrcPackage = serde_json::from_reader::<File, CrcPackage>(File::open(&file)?).context("Invalid CRC Json")?;
+
+        package.file_path = file.as_ref().canonicalize()?.to_str().context("Could not convert CRC File Path to String")?.to_string();
 
         Ok(package)
     }
