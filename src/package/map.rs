@@ -276,7 +276,15 @@ impl AtcMap {
                                         .cloned()
                                         .unwrap_or(serde_json::to_value(default_text_size)?),
                                 );
-                                new_props.insert("text".to_string(), serde_json::to_value(text.clone().as_str().unwrap_or_default())?);
+                                let mut text_str = "".to_string();
+                                for line in (&text).as_array().unwrap_or(&Vec::new()) {
+                                    if text_str == "" {
+                                        text_str = line.as_str().unwrap_or_default().to_string();
+                                    } else {
+                                        text_str = format!("{}\n{}", &text_str, line.as_str().unwrap_or_default());
+                                    }
+                                }
+                                new_props.insert("text".to_string(), serde_json::to_value(&text_str)?);
                                 new_props.insert("showText".to_string(), serde_json::to_value(true)?);
                             } else {
                                 new_props.insert(
@@ -312,20 +320,17 @@ impl AtcMap {
                                     .cloned()
                                     .unwrap_or(serde_json::to_value(&default_line_thickness)?),
                             );
-                        },
+                        }
                         &_ => {}
                     };
 
                     if let Some(asdex_item_type) = properties.get(&"asdex".to_string()) {
-                        new_props.insert(
-                            "itemType".to_string(),
-                            asdex_item_type.clone()
-                        );
+                        new_props.insert("itemType".to_string(), asdex_item_type.clone());
                         new_props.remove(&"color".to_string());
                     } else {
                         new_props.insert(
                             "itemType".to_string(),
-                            serde_json::to_value(format!("stars-{}", &map_ref.stars_brightness_category))?
+                            serde_json::to_value(format!("stars-{}", &map_ref.stars_brightness_category))?,
                         );
                     }
 
@@ -344,7 +349,7 @@ impl AtcMap {
                 features: FeatureCollection {
                     bbox: None,
                     features: new_features,
-                    foreign_members: None
+                    foreign_members: None,
                 },
             });
         }

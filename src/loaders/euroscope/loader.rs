@@ -64,7 +64,7 @@ impl EuroScopeLoaderPrf {
                                     "sector" => {
                                         sector_file =
                                             EuroScopeLoader::try_convert_es_path(&prf_file, items[2])?
-                                                .canonicalize()?
+                                                .canonicalize().context(format!("Error opening sector file {:?}!", items[2]))?
                                                 .to_str()
                                                 .unwrap()
                                                 .to_owned();
@@ -112,7 +112,9 @@ impl EuroScopeLoader {
                 if path.is_dir() {
                     results.append(&mut Self::try_new_from_dir(&path)?.prfs);
                 } else if entry.file_name().to_str().unwrap().contains(".prf"){
-                    results.push(EuroScopeLoaderPrf::try_new_from_prf(&path)?);
+                    if let Ok(result) = EuroScopeLoaderPrf::try_new_from_prf(&path) {
+                        results.push(result);
+                    }
                 }
             }
         }
@@ -160,27 +162,30 @@ impl EuroScopeLoader {
             for asr_source in &prf.asr_files {
                 let mut asr = EsAsr::try_from_asr_file(&asr_source.1)?;
                 if !asr.1.is_empty() {
-                    let asr_sector_path = Self::try_convert_es_path(&prf.prf_file, &asr.1)?.canonicalize()?.to_str().unwrap().to_owned();
-                    if !ret_val.sectors.contains_key(&asr_sector_path) {
-                        let asr_sct_reader = SctReader::new(BufReader::new(File::open(&asr_sector_path)?));
-                        let asr_sct_result = asr_sct_reader.try_read()?;
-
-                        let asr_ese_file = asr_sector_path.replace(".sct", ".ese");
-                        let asr_sct_ese_result = match std::fs::exists(&asr_ese_file) {
-                            Ok(true) => {
-                                if let Ok(file) = File::open(&asr_ese_file) {
-                                    let reader = EseReader::new(BufReader::new(file));
-                                    reader.try_read().ok()
-                                } else {
-                                    None
-                                }
-                            },
-                            _ => None
-                        };
-                        ret_val.sectors.insert(asr_sector_path.to_string(), (asr_sct_result, asr_sct_ese_result));
-                    }
-
-                    asr.0.sector_file_id = Some(asr_sector_path.to_string());
+                    if let Ok(asr_sector_pbuf) = Self::try_convert_es_path(&prf.prf_file, &asr.1)?.canonicalize() {
+                        let asr_sector_path = asr_sector_pbuf.as_os_str().to_str().unwrap_or_default().to_string();
+                        if !ret_val.sectors.contains_key(&asr_sector_path) {
+                            let asr_sct_reader = SctReader::new(BufReader::new(File::open(&asr_sector_path)?));
+                            let asr_sct_result = asr_sct_reader.try_read()?;
+    
+                            let asr_ese_file = asr_sector_path.replace(".sct", ".ese");
+                            let asr_sct_ese_result = match std::fs::exists(&asr_ese_file) {
+                                Ok(true) => {
+                                    if let Ok(file) = File::open(&asr_ese_file) {
+                                        let reader = EseReader::new(BufReader::new(file));
+                                        reader.try_read().ok()
+                                    } else {
+                                        None
+                                    }
+                                },
+                                _ => None
+                            };
+                            ret_val.sectors.insert(asr_sector_path.to_string(), (asr_sct_result, asr_sct_ese_result));
+                        }
+                        asr.0.sector_file_id = Some(asr_sector_path.to_string());
+                    } else {
+                        asr.0.sector_file_id = Some(res_prf.default_sector_id.clone());
+                    }                 
                 } else {
                     asr.0.sector_file_id = Some(res_prf.default_sector_id.clone());
                 }
