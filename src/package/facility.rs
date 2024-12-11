@@ -5,12 +5,14 @@ use serde::{Deserialize, Serialize};
 use crate::loaders::vnas_crc::CrcVideoMapRef;
 use crate::loaders::vnas_crc::facility::CrcFacility;
 use super::display::AtcDisplay;
+use super::position::AtcPosition;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct AtcFacility {
     pub name: String,
     pub displays: Vec<AtcDisplay>,
-    pub child_facilities: Vec<AtcFacility>
+    pub child_facilities: Vec<AtcFacility>,
+    pub positions: Vec<AtcPosition>
 }
 
 impl AtcFacility {
@@ -34,7 +36,8 @@ impl AtcFacility {
         }
 
         if let Some(asdex_cfg) = &value.asdex_configuration {
-            displays.push(AtcDisplay::from_crc_twr_asdex("asdex".to_string(), "ASDE-X".to_string(), asdex_cfg));
+            displays.push(AtcDisplay::from_crc_twr_asdex("asdex-day".to_string(), "ASDE-X (Day)".to_string(), asdex_cfg));
+            displays.push(AtcDisplay::from_crc_twr_asdex("asdex-night".to_string(), "ASDE-X (Night)".to_string(), asdex_cfg));
         }
         if let Some(twr_cfg) = &value.tower_cab_configuration {
             displays.push(AtcDisplay::from_crc_twr_asdex("twrcab".to_string(), "Tower Cab".to_string(), twr_cfg));
@@ -43,7 +46,8 @@ impl AtcFacility {
         Ok(Self {
             name: value.name.to_string(),
             child_facilities: children,
-            displays: displays
+            displays: displays,
+            positions: Vec::new()
         })
     }
 }

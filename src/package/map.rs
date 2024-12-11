@@ -10,6 +10,7 @@ use anyhow::{anyhow, bail, Context};
 use geojson::{Feature, FeatureCollection, GeoJson, Geometry, Value};
 use serde::{Deserialize, Serialize};
 use serde_json::Map;
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
@@ -17,7 +18,6 @@ use std::path::Path;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AtcMap {
     pub name: String,
-    pub map_type: String,
     pub features: FeatureCollection,
 }
 
@@ -28,6 +28,7 @@ impl AtcMap {
         for line in value.lines {
             // Properties
             let mut props_map = Map::new();
+            props_map.insert("itemType".to_string(), serde_json::to_value(&item_type)?);
             if let Some(line_color) = line.colour {
                 props_map.insert(
                     "color".to_string(),
@@ -49,7 +50,6 @@ impl AtcMap {
 
         Ok(AtcMap {
             name: name,
-            map_type: item_type,
             features: FeatureCollection {
                 bbox: None,
                 features: features,
@@ -64,6 +64,7 @@ impl AtcMap {
         for region in value.regions {
             // Properties
             let mut props_map = Map::new();
+            props_map.insert("itemType".to_string(), serde_json::to_value(&item_type)?);
             props_map.insert(
                 "color".to_string(),
                 serde_json::to_value(format!("#{:02X}{:02X}{:02X}", region.colour.r, region.colour.g, region.colour.b))?,
@@ -85,7 +86,6 @@ impl AtcMap {
 
         Ok(AtcMap {
             name: name,
-            map_type: item_type,
             features: FeatureCollection {
                 bbox: None,
                 features: features,
@@ -100,6 +100,7 @@ impl AtcMap {
         for label in value.labels {
             // Properties
             let mut props_map = Map::new();
+            props_map.insert("itemType".to_string(), serde_json::to_value(&item_type)?);
             props_map.insert(
                 "textColor".to_string(),
                 serde_json::to_value(format!("#{:02X}{:02X}{:02X}", label.colour.r, label.colour.g, label.colour.b))?,
@@ -118,7 +119,6 @@ impl AtcMap {
 
         Ok(AtcMap {
             name: name,
-            map_type: item_type,
             features: FeatureCollection {
                 bbox: None,
                 features: features,
@@ -133,6 +133,7 @@ impl AtcMap {
         for label in value.entries {
             // Properties
             let mut props_map = Map::new();
+            props_map.insert("itemType".to_string(), serde_json::to_value(&item_type)?);
             props_map.insert("text".to_string(), serde_json::to_value(label.text.to_string())?);
             props_map.insert("showText".to_string(), serde_json::to_value(true)?);
 
@@ -147,7 +148,6 @@ impl AtcMap {
 
         Ok(AtcMap {
             name: name,
-            map_type: item_type,
             features: FeatureCollection {
                 bbox: None,
                 features: features,
@@ -167,16 +167,185 @@ impl AtcMap {
             .join(format!("{}.geojson", map_ref.id))
             .canonicalize()?;
 
-        let geojson = GeoJson::from_reader(BufReader::new(
-            File::open(&video_map_path).context(format!("Couldn't open video map at path {}", &video_map_path.to_str().unwrap_or_default().to_string()))?,
-        ))
+        let geojson = GeoJson::from_reader(BufReader::new(File::open(&video_map_path).context(format!(
+            "Couldn't open video map at path {}",
+            &video_map_path.to_str().unwrap_or_default().to_string()
+        ))?))
         .context("Couldn't parse GeoJSON")?;
 
-        if let GeoJson::FeatureCollection(features) = geojson {
+        if let GeoJson::FeatureCollection(mut features) = geojson {
+            let mut new_features = Vec::new();
+            let mut default_line_style = "solid".to_string();
+            let mut default_line_thickness = 1;
+            let mut default_text_opaque = false;
+            let mut default_text_size = 1;
+            let mut default_text_underline = false;
+            let mut default_text_offset = (0, 0);
+            let mut default_symbol_style = "".to_string();
+            let mut default_symbol_size = 1;
+
+            for feature in &features {
+                let properties = feature.properties.clone().unwrap_or_default();
+                // Handle Defaults
+                if properties
+                    .get(&"isLineDefaults".to_string())
+                    .unwrap_or(&serde_json::Value::Bool(false))
+                    .as_bool()
+                    .unwrap_or(false)
+                {
+                    if let Some(value) = properties.get(&"style".to_string()) {
+                        default_line_style = value.as_str().unwrap_or_default().to_lowercase();
+                    }
+                    if let Some(value) = properties.get(&"thickness".to_string()) {
+                        default_line_thickness = value.as_i64().unwrap_or(1) as i32;
+                    }
+                } else if properties
+                    .get(&"isTextDefaults".to_string())
+                    .unwrap_or(&serde_json::Value::Bool(false))
+                    .as_bool()
+                    .unwrap_or(false)
+                {
+                    if let Some(value) = properties.get(&"size".to_string()) {
+                        default_text_size = value.as_i64().unwrap_or(1) as i32;
+                    }
+                    if let Some(value) = properties.get(&"xOffset".to_string()) {
+                        default_text_offset.0 = value.as_i64().unwrap_or(0) as i32;
+                    }
+                    if let Some(value) = properties.get(&"yOffset".to_string()) {
+                        default_text_offset.1 = value.as_i64().unwrap_or(0) as i32;
+                    }
+                    if let Some(value) = properties.get(&"opaque".to_string()) {
+                        default_text_opaque = value.as_bool().unwrap_or(false);
+                    }
+                    if let Some(value) = properties.get(&"underline".to_string()) {
+                        default_text_underline = value.as_bool().unwrap_or(false);
+                    }
+                } else if properties
+                    .get(&"isSymbolDefaults".to_string())
+                    .unwrap_or(&serde_json::Value::Bool(false))
+                    .as_bool()
+                    .unwrap_or(false)
+                {
+                    if let Some(value) = properties.get(&"style".to_string()) {
+                        default_symbol_style = value.as_str().unwrap_or_default().to_lowercase();
+                    }
+                    if let Some(value) = properties.get(&"size".to_string()) {
+                        default_symbol_size = value.as_i64().unwrap_or(1) as i32;
+                    }
+                } else if let Some(geometry) = &feature.geometry {
+                    let mut new_props = serde_json::Map::new();
+
+                    // Set color
+                    if let Some(color) = properties.get(&"color".to_string()) {
+                        new_props.insert("color".to_string(), color.clone());
+                    }
+
+                    if let Some(z_index) = properties.get(&"zIndex".to_string()) {
+                        new_props.insert("zIndex".to_string(), z_index.clone());
+                    }
+
+                    match geometry.value.type_name() {
+                        "Point" => {
+                            // Check for text
+                            if let Some(text) = properties.get(&"text".to_string()) {
+                                new_props.insert(
+                                    "size".to_string(),
+                                    properties
+                                        .get(&"size".to_string())
+                                        .cloned()
+                                        .unwrap_or(serde_json::to_value(default_text_size)?),
+                                );
+                                new_props.insert(
+                                    "opaque".to_string(),
+                                    properties
+                                        .get(&"opaque".to_string())
+                                        .cloned()
+                                        .unwrap_or(serde_json::to_value(default_text_opaque)?),
+                                );
+                                new_props.insert(
+                                    "underline".to_string(),
+                                    properties
+                                        .get(&"underline".to_string())
+                                        .cloned()
+                                        .unwrap_or(serde_json::to_value(default_text_underline)?),
+                                );
+                                new_props.insert(
+                                    "size".to_string(),
+                                    properties
+                                        .get(&"size".to_string())
+                                        .cloned()
+                                        .unwrap_or(serde_json::to_value(default_text_size)?),
+                                );
+                                new_props.insert("text".to_string(), serde_json::to_value(text.clone().as_str().unwrap_or_default())?);
+                                new_props.insert("showText".to_string(), serde_json::to_value(true)?);
+                            } else {
+                                new_props.insert(
+                                    "style".to_string(),
+                                    properties
+                                        .get(&"style".to_string())
+                                        .cloned()
+                                        .unwrap_or(serde_json::to_value(default_symbol_style.to_string())?),
+                                );
+                                new_props.insert(
+                                    "size".to_string(),
+                                    properties
+                                        .get(&"size".to_string())
+                                        .cloned()
+                                        .unwrap_or(serde_json::to_value(default_symbol_size)?),
+                                );
+                                new_props.insert("showSymbol".to_string(), serde_json::to_value(true)?);
+                            }
+                        }
+                        "LineString" => {
+                            new_props.insert(
+                                "style".to_string(),
+                                properties
+                                    .get(&"style".to_string())
+                                    .cloned()
+                                    .unwrap_or(serde_json::to_value(default_line_style.to_string())?),
+                            );
+
+                            new_props.insert(
+                                "thickness".to_string(),
+                                properties
+                                    .get(&"thickness".to_string())
+                                    .cloned()
+                                    .unwrap_or(serde_json::to_value(&default_line_thickness)?),
+                            );
+                        },
+                        &_ => {}
+                    };
+
+                    if let Some(asdex_item_type) = properties.get(&"asdex".to_string()) {
+                        new_props.insert(
+                            "itemType".to_string(),
+                            asdex_item_type.clone()
+                        );
+                        new_props.remove(&"color".to_string());
+                    } else {
+                        new_props.insert(
+                            "itemType".to_string(),
+                            serde_json::to_value(format!("stars-{}", &map_ref.stars_brightness_category))?
+                        );
+                    }
+
+                    new_features.push(Feature {
+                        bbox: feature.bbox.clone(),
+                        geometry: feature.geometry.clone(),
+                        id: feature.id.clone(),
+                        properties: Some(new_props),
+                        foreign_members: feature.foreign_members.clone(),
+                    });
+                }
+            }
+
             return Ok(AtcMap {
                 name: map_ref.name.to_string(),
-                map_type: map_ref.stars_brightness_category.to_string(),
-                features: features,
+                features: FeatureCollection {
+                    bbox: None,
+                    features: new_features,
+                    foreign_members: None
+                },
             });
         }
 

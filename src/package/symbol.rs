@@ -47,11 +47,21 @@ pub enum SymbolDrawItem {
     Arc {
         center: (i8, i8),
         radius: i8,
+        inner_radius: i8,
         start_angle: i16,
         end_angle: i16,
         fill: bool,
     },
     SetPixel((i8, i8)),
+    Ellipse {
+        center: (i8, i8),
+        radius: (i8, i8),
+        inner_radius: (i8, i8),
+        rotation: i16,
+        start_angle: i16,
+        end_angle: i16,
+        fill: bool
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -125,6 +135,7 @@ impl SymbolIcon {
                         draw_items.push(SymbolDrawItem::Arc {
                             center: (split[1].parse()?, split[2].parse()?),
                             radius: split[3].parse()?,
+                            inner_radius: 0,
                             start_angle: split[4].parse()?,
                             end_angle: split[5].parse()?,
                             fill: false,
@@ -134,6 +145,7 @@ impl SymbolIcon {
                         draw_items.push(SymbolDrawItem::Arc {
                             center: (split[1].parse()?, split[2].parse()?),
                             radius: split[3].parse()?,
+                            inner_radius: 0,
                             start_angle: split[4].parse()?,
                             end_angle: split[5].parse()?,
                             fill: true,

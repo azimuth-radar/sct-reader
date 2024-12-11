@@ -60,7 +60,7 @@ fn test_load_es_2(){
 #[test]
 #[ignore]
 fn test_load_crc_1() {
-    let crc_path = r#"/Users/pshivaraman/Downloads/CRC/ARTCCs/ZNY.json"#;
+    let crc_path = r#"C:\Programs\CRC\ARTCCs\ZNY.json"#;
     let crc_package = CrcPackage::try_new_from_file(crc_path).unwrap();
 
     let package = AtcScopePackage::try_from(&crc_package).unwrap();

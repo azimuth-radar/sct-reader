@@ -15,32 +15,9 @@ use super::symbol::SymbolIcon;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum AtcDisplayItem {
-    Map{id: String},
+    Map{id: String, visible: bool},
     Symbol{id: String, show_symbol: bool, show_label: bool},
     NavdataItem{symbol_type: String, ident: String, show_symbol: bool, show_label: bool},
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[repr(u8)]
-pub enum LineStyle {
-    #[default]
-    Solid = 0,
-    Dash = 1,
-    Dot = 2,
-    DashDot = 3,
-    DashDotDot = 4
-}
-
-impl From<u8> for LineStyle {
-    fn from(value: u8) -> Self {
-        match value {
-            1 => Self::Dash,
-            2 => Self::Dot,
-            3 => Self::DashDot,
-            4 => Self::DashDotDot,
-            _ => Self::Solid
-        }
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -79,8 +56,16 @@ pub struct DisplayDefaultConfig {
     pub color: Colour,
     pub size: f32,
     pub line_weight: u8,
-    pub line_style: LineStyle,
+    pub line_style: String,
     pub text_align: TextAlign,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub enum AtcDisplayBackground {
+    #[default]
+    Blank,
+    Satellite,
+    Color(String),
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -88,7 +73,9 @@ pub struct AtcDisplayType {
     pub id: String,
     pub map_defaults: HashMap<String, DisplayDefaultConfig>,
     pub symbol_defaults:  HashMap<String, (DisplayDefaultConfig, DisplayDefaultConfig)>,
-    pub symbol_icons: HashMap<String, SymbolIcon>
+    pub symbol_icons: HashMap<String, SymbolIcon>,
+    pub line_types: HashMap<String, Vec<u8>>,
+    pub background: AtcDisplayBackground
 }
 
 impl AtcDisplayType {
@@ -96,6 +83,7 @@ impl AtcDisplayType {
         let mut map_defaults = HashMap::new();
         let mut symbol_defaults = HashMap::new();
         let mut symbol_icons = HashMap::new();
+        let mut background = AtcDisplayBackground::Blank;
 
         for symbol in symbology.symbols {
             if matches!(symbol.item_type, SymbologyItemType::Airports | SymbologyItemType::Fixes | SymbologyItemType::Vors | SymbologyItemType::Ndbs) {
@@ -104,13 +92,13 @@ impl AtcDisplayType {
                 for attr in symbol.defs {
                     if attr.attribute == "name" {
                         name_cfg.color = attr.color;
-                        name_cfg.line_style = attr.line_style.into();
+                        name_cfg.line_style = Self::es_line_type_to_string(attr.line_style);
                         name_cfg.line_weight = attr.line_weight;
                         name_cfg.size = attr.size;
                         name_cfg.text_align = attr.text_align.into();
                     } else {
                         symb_cfg.color = attr.color;
-                        symb_cfg.line_style = attr.line_style.into();
+                        symb_cfg.line_style = Self::es_line_type_to_string(attr.line_style);
                         symb_cfg.line_weight = attr.line_weight;
                         symb_cfg.size = attr.size;
                         symb_cfg.text_align = attr.text_align.into();
@@ -123,7 +111,7 @@ impl AtcDisplayType {
                 for attr in symbol.defs {
                     if attr.attribute == "line" {
                         cfg.color = attr.color;
-                        cfg.line_style = attr.line_style.into();
+                        cfg.line_style = Self::es_line_type_to_string(attr.line_style);
                         cfg.line_weight = attr.line_weight;
                         cfg.size = attr.size;
                         cfg.text_align = attr.text_align.into();
@@ -131,6 +119,12 @@ impl AtcDisplayType {
                 }
 
                 map_defaults.insert(symbol.item_type.to_key_string(), cfg);
+            } else if symbol.item_type == SymbologyItemType::Sector {
+                for attr in symbol.defs {
+                    if attr.attribute == "active sector background" {
+                        background = AtcDisplayBackground::Color(format!("#{:02X}{:02X}{:02X}", attr.color.r, attr.color.g, attr.color.b));
+                    }
+                }
             }
         }
 
@@ -144,8 +138,30 @@ impl AtcDisplayType {
             id: id.to_string(),
             map_defaults,
             symbol_defaults,
-            symbol_icons
+            symbol_icons,
+            line_types: Self::get_es_line_types(),
+            background: background
         })
+    }
+
+    fn get_es_line_types() -> HashMap<String, Vec<u8>> {
+        HashMap::from([
+            ("solid".to_string(), vec![1]),
+            ("dash".to_string(), vec![18, 6]),
+            ("dot".to_string(), vec![3, 3]),
+            ("dash-dot".to_string(), vec![9, 6, 3, 6]),
+            ("dash-dot-dot".to_string(), vec![9, 3, 3, 3, 3, 3])
+        ])
+    }
+
+    fn es_line_type_to_string(input: u8) -> String {
+        match input {
+            1 => "dash".to_string(),
+            2 => "dot".to_string(),
+            3 => "dash-dot".to_string(),
+            4 => "dash-dot-dot".to_string(),
+            _ => "solid".to_string()
+        }
     }
 }
 
@@ -207,13 +223,13 @@ impl AtcDisplay {
                     }                    
                 }
             } else if matches!(item.item_type, SymbologyItemType::ArtccBoundary | SymbologyItemType::ArtccHighBoundary | SymbologyItemType::ArtccLowBoundary | SymbologyItemType::Geo | SymbologyItemType::HighAirways | SymbologyItemType::LowAirways | SymbologyItemType::Region | SymbologyItemType::Sids | SymbologyItemType::Stars) {
-                items.push(AtcDisplayItem::Map { id: format!("{}_{}_{}", sector_id.to_string(), item.item_type.to_key_string(), item.name) })
+                items.push(AtcDisplayItem::Map { id: format!("{}_{}_{}", sector_id.to_string(), item.item_type.to_key_string(), item.name), visible: true })
             } else if matches!(item.item_type, SymbologyItemType::Label) {
                 if item.attribute == "freetext" {
                     let name_split = item.name.split("\\").collect::<Vec<&str>>();
                     if name_split.len() >= 1 {
                         if !loaded_freetexts.contains_key(&name_split[0].to_string()) {
-                            items.push(AtcDisplayItem::Map {id: format!("{}_{}_{}", sector_id.to_string(), item.item_type.to_key_string(), name_split[0].to_string())});
+                            items.push(AtcDisplayItem::Map {id: format!("{}_{}_{}", sector_id.to_string(), item.item_type.to_key_string(), name_split[0].to_string()), visible: true});
                             loaded_freetexts.insert(name_split[0].to_string(), ());
                         }
                     }
@@ -233,7 +249,7 @@ impl AtcDisplay {
             center: twr_cfg.tower_location.unwrap_or_default(),
             screen_height: Length::from_nautical_miles(twr_cfg.default_zoom_range.into()),
             rotation: Angle::from_degrees(twr_cfg.default_rotation.into()),
-            display_items: vec![AtcDisplayItem::Map {id: twr_cfg.video_map_id.to_string()}]
+            display_items: vec![AtcDisplayItem::Map {id: twr_cfg.video_map_id.to_string(), visible: true}]
         }
     }
 
@@ -242,12 +258,11 @@ impl AtcDisplay {
         let mut display_items_tdm = Vec::new();
 
         for video_map_id in video_map_ids {
-            display_items_tdm.push(AtcDisplayItem::Map {id: video_map_id.to_string()});
-
             // Check for TDM
-            if let Some(map_ref) = map_refs.get(video_map_id) {
+            if let Some(map_ref) = map_refs.get(video_map_id) {                
+                display_items_tdm.push(AtcDisplayItem::Map {id: video_map_id.to_string(), visible: map_ref.stars_always_visible});
                 if !map_ref.tdm_only {
-                    display_items.push(AtcDisplayItem::Map {id: video_map_id.to_string()});
+                    display_items.push(AtcDisplayItem::Map {id: video_map_id.to_string(), visible: map_ref.stars_always_visible});
                 }
             }
         }

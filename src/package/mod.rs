@@ -3,13 +3,13 @@ use aviation_calc_util::{
     geo::{Bearing, GeoPoint},
     units::{Angle, Length},
 };
-use display::{AtcDisplay, AtcDisplayType, DisplayDefaultConfig, LineStyle};
+use display::{AtcDisplay, AtcDisplayBackground, AtcDisplayType, DisplayDefaultConfig};
 use geojson::{Feature, FeatureCollection, GeoJson, Geometry, Value};
 use map::AtcMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Map;
 use std::{collections::HashMap, hash::Hash};
-use symbol::{AtcMapSymbol, SymbolIcon};
+use symbol::{AtcMapSymbol, SymbolDrawItem, SymbolIcon};
 
 use crate::loaders::euroscope::{
     colour::Colour,
@@ -27,6 +27,7 @@ pub use facility::AtcFacility;
 
 pub mod display;
 pub mod map;
+pub mod position;
 pub mod symbol;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -219,13 +220,16 @@ impl TryFrom<&CrcPackage> for AtcScopePackage {
         // Process facility
         package.facilities.push(AtcFacility::try_from_crc(&value.facility, &maps_map)?);
 
+        // ERAM Symbols
         package.display_types.insert(
             "eram".to_string(),
             AtcDisplayType {
                 id: "eram".to_string(),
                 map_defaults: Default::default(),
                 symbol_defaults: Default::default(),
-                symbol_icons: Default::default(),
+                symbol_icons: Self::get_eram_symbols(),
+                line_types: Self::get_eram_lines(),
+                background: AtcDisplayBackground::Color("#000000".to_string())
             },
         );
 
@@ -236,16 +240,42 @@ impl TryFrom<&CrcPackage> for AtcScopePackage {
                 map_defaults: Default::default(),
                 symbol_defaults: Default::default(),
                 symbol_icons: Default::default(),
+                line_types: Default::default(),
+                background: AtcDisplayBackground::Color("#000000".to_string())
             },
         );
 
         package.display_types.insert(
-            "asdex".to_string(),
+            "asdex-day".to_string(),
             AtcDisplayType {
-                id: "asdex".to_string(),
-                map_defaults: Default::default(),
+                id: "asdex-day".to_string(),
+                map_defaults: HashMap::from([
+                    ("taxiway".to_string(), DisplayDefaultConfig { color: Colour { r: 45, g: 45, b: 45 }, ..Default::default()}),
+                    ("apron".to_string(), DisplayDefaultConfig { color: Colour { r: 70, g: 70, b: 70 }, ..Default::default()}),
+                    ("structure".to_string(), DisplayDefaultConfig { color: Colour { r: 96, g: 96, b: 96 }, ..Default::default()}),
+                    ("runway".to_string(), DisplayDefaultConfig { color: Colour { r: 0, g: 0, b: 0 }, ..Default::default()}),
+                ]),
                 symbol_defaults: Default::default(),
                 symbol_icons: Default::default(),
+                line_types: Default::default(),
+                background: AtcDisplayBackground::Color("#005C73".to_string())
+            },
+        );
+
+        package.display_types.insert(
+            "asdex-night".to_string(),
+            AtcDisplayType {
+                id: "asdex-night".to_string(),
+                map_defaults: HashMap::from([
+                    ("taxiway".to_string(), DisplayDefaultConfig { color: Colour { r: 16, g: 37, b: 76 }, ..Default::default()}),
+                    ("apron".to_string(), DisplayDefaultConfig { color: Colour { r: 17, g: 52, b: 93 }, ..Default::default()}),
+                    ("structure".to_string(), DisplayDefaultConfig { color: Colour { r: 32, g: 60, b: 98 }, ..Default::default()}),
+                    ("runway".to_string(), DisplayDefaultConfig { color: Colour { r: 0, g: 0, b: 0 }, ..Default::default()}),
+                ]),
+                symbol_defaults: Default::default(),
+                symbol_icons: Default::default(),
+                line_types: Default::default(),
+                background: AtcDisplayBackground::Color("#393939".to_string())
             },
         );
 
@@ -256,9 +286,160 @@ impl TryFrom<&CrcPackage> for AtcScopePackage {
                 map_defaults: Default::default(),
                 symbol_defaults: Default::default(),
                 symbol_icons: Default::default(),
+                line_types: Default::default(),
+                background: display::AtcDisplayBackground::Satellite
             },
         );
 
         Ok(package)
+    }
+}
+
+impl AtcScopePackage {
+    fn get_eram_symbols() -> HashMap<String, SymbolIcon> {
+        HashMap::from([
+            ("vor".to_string(), SymbolIcon {
+                symbol_type: "vor".to_string(),
+                draw_items: vec![
+                    SymbolDrawItem::Ellipse { center: (0, 0), radius: (3, 5), inner_radius: (0, 0), rotation: 0, start_angle: 0, end_angle: 360, fill: false }
+                ],
+            }),
+            ("ndb".to_string(), SymbolIcon {
+                symbol_type: "ndb".to_string(),
+                draw_items: vec![
+                    SymbolDrawItem::Ellipse { center: (0, 0), radius: (3, 5), inner_radius: (0, 0), rotation: 0, start_angle: 0, end_angle: 360, fill: false },
+                    SymbolDrawItem::Line { start: (-4, -7), end: (4, 7) }
+                ]
+            }),
+            ("obstruction1".to_string(), SymbolIcon {
+                symbol_type: "obstruction1".to_string(),
+                draw_items: vec![
+                    SymbolDrawItem::Line { start: (-3, -6), end: (3, 6) },
+                    SymbolDrawItem::Line { start: (-3, 6), end: (3, -6) },
+                    SymbolDrawItem::Line { start: (-3, 7), end: (3, 7)}
+                ]
+            }),
+            ("obstruction2".to_string(), SymbolIcon {
+                symbol_type: "obstruction2".to_string(),
+                draw_items: vec![
+                    SymbolDrawItem::Line { start: (-5, -6), end: (0, 6) },
+                    SymbolDrawItem::Line { start: (0, 6), end: (5, -6) },
+                    SymbolDrawItem::Arc { center: (0, -4), radius: 2, inner_radius: 0, start_angle: 0, end_angle: 360, fill: true }
+                ]
+            }),
+            ("heliport".to_string(), SymbolIcon {
+                symbol_type: "heliport".to_string(),
+                draw_items: vec![
+                    SymbolDrawItem::Arc { center: (0, 0), radius: 6, inner_radius: 0, start_angle: 0, end_angle: 360, fill: false },
+                    SymbolDrawItem::Line { start: (-2, 0), end: (2, 0) },
+                    SymbolDrawItem::Line { start: (-2, 2), end: (-2, -2) },
+                    SymbolDrawItem::Line { start: (2, 2), end: (2, -2) }
+                ]
+            }),
+            ("nuclear".to_string(), SymbolIcon {
+                symbol_type: "nuclear".to_string(),
+                draw_items: vec![
+                    SymbolDrawItem::Line { start: (-1, 0), end: (1, 0) },
+                    SymbolDrawItem::Line { start: (0, 1), end: (0, -1) },
+                    SymbolDrawItem::Arc { center: (0, 0), radius: 6, inner_radius: 3, start_angle: 180, end_angle: 240, fill: true },
+                    SymbolDrawItem::Arc { center: (0, 0), radius: 6, inner_radius: 3, start_angle: 300, end_angle: 360, fill: true },
+                    SymbolDrawItem::Arc { center: (0, 0), radius: 6, inner_radius: 3, start_angle: 60, end_angle: 120, fill: true }
+                ]
+            }),
+            ("emergencyairport".to_string(), SymbolIcon {
+                symbol_type: "emergencyairport".to_string(),
+                draw_items: vec![
+                    SymbolDrawItem::Line { start: (-2, 2), end: (2, 2) },
+                    SymbolDrawItem::Line { start: (2, 2), end: (2, -2) },
+                    SymbolDrawItem::Line { start: (2, -2), end: (-2, -2) },
+                    SymbolDrawItem::Line { start: (-2, -2), end: (-2, 2) },
+                    SymbolDrawItem::Line { start: (-5, 5), end: (-2, 2) },
+                    SymbolDrawItem::Line { start: (2, -2), end: (5, -5) }
+                ]
+            }),
+            ("radar".to_string(), SymbolIcon {
+                symbol_type: "radar".to_string(),
+                draw_items: vec![
+                    SymbolDrawItem::Line { start: (0, 3), end: (0, -3) },
+                    SymbolDrawItem::Line { start: (0, 3), end: (-4, -2) },
+                    SymbolDrawItem::Line { start: (0, -3), end: (4, 2)},
+                    SymbolDrawItem::Arc { center: (1, 1), radius: 7, inner_radius: 0, start_angle: 90, end_angle: 180, fill: false }
+                ]
+            }),
+            ("iaf".to_string(), SymbolIcon {
+                symbol_type: "iaf".to_string(),
+                draw_items: vec![
+                    SymbolDrawItem::Line { start: (-4, 0), end: (4, 0) },
+                    SymbolDrawItem::Line { start: (0, 4), end: (0, -4) },
+                    SymbolDrawItem::Arc { center: (0, 0), radius: 4, inner_radius: 0, start_angle: 0, end_angle: 360, fill: false }
+                ]
+            }),
+            ("rnavonlywaypoint".to_string(), SymbolIcon {
+                symbol_type: "rnavonlywaypoint".to_string(),
+                draw_items: vec![
+                    SymbolDrawItem::Arc { center: (0, 0), radius: 3, inner_radius: 0, start_angle: 0, end_angle: 360, fill: false },
+                    SymbolDrawItem::Arc { center: (0, 0), radius: 5, inner_radius: 0, start_angle: 0, end_angle: 360, fill: false }
+                ]
+            }),
+            ("rnav".to_string(), SymbolIcon {
+                symbol_type: "rnav".to_string(),
+                draw_items: vec![
+                    SymbolDrawItem::Line { start: (-2, 0), end: (2, 0) },
+                    SymbolDrawItem::Line { start: (0, 2), end: (0, -2) },
+                    SymbolDrawItem::Line { start: (-2, 2), end: (2, 2) },
+                    SymbolDrawItem::Line { start: (2, 2), end: (2, -2) },
+                    SymbolDrawItem::Line { start: (2, -2), end: (-2, -2) },
+                    SymbolDrawItem::Line { start: (-2, -2), end: (-2, 2) }
+                ]
+            }),
+            ("airwayintersections".to_string(), SymbolIcon {
+                symbol_type: "airwayintersections".to_string(),
+                draw_items: vec![
+                    SymbolDrawItem::Line { start: (-3, -3), end: (3, -3) },
+                    SymbolDrawItem::Line { start: (3, -3), end: (0, 3) },
+                    SymbolDrawItem::Line { start: (0, 3), end: (-3, -3) }
+                ]
+            }),
+            ("otherwaypoints".to_string(), SymbolIcon {
+                symbol_type: "otherwaypoints".to_string(),
+                draw_items: vec![
+                    SymbolDrawItem::Line { start: (-5, 0), end: (5, 0) },
+                    SymbolDrawItem::Line { start: (0, 5), end: (0, -5) }
+                ]
+            }),
+            ("airport".to_string(), SymbolIcon {
+                symbol_type: "airport".to_string(),
+                draw_items: vec![
+                    SymbolDrawItem::Line { start: (-2, 2), end: (2, 2) },
+                    SymbolDrawItem::Line { start: (2, 2), end: (2, -2) },
+                    SymbolDrawItem::Line { start: (2, -2), end: (-2, -2) },
+                    SymbolDrawItem::Line { start: (-2, -2), end: (-2, 2) }
+                ]
+            }),
+            ("satelliteairport".to_string(), SymbolIcon {
+                symbol_type: "satelliteairport".to_string(),
+                draw_items: vec![
+                    SymbolDrawItem::Line { start: (-6, -4), end: (-6, 3) },
+                    SymbolDrawItem::Line { start: (-6, 3), end: (5, 3) }
+                ]
+            }),
+            ("tacan".to_string(), SymbolIcon {
+                symbol_type: "tacan".to_string(),
+                draw_items: vec![
+                    SymbolDrawItem::Ellipse { center: (0, 0), radius: (3, 5), inner_radius: (0, 0), rotation: 0, start_angle: 0, end_angle: 360, fill: false },
+                    SymbolDrawItem::Line { start: (-2, 0), end: (2, 0) },
+                    SymbolDrawItem::Line { start: (0, 2), end: (0, -2) },
+                ]
+            })
+        ])
+    }
+
+    fn get_eram_lines() -> HashMap<String, Vec<u8>> {
+        HashMap::from([
+            ("solid".to_string(), vec![1]),
+            ("shortdashed".to_string(), vec![8, 8]),
+            ("longdashed".to_string(), vec![16, 16]),
+            ("longdashshortdash".to_string(), vec![14, 6, 6, 6])
+        ])
     }
 }
