@@ -247,7 +247,7 @@ impl AtcDisplay {
             name: display_name.to_string(),
             display_type: display_type.to_string(),
             center: twr_cfg.tower_location.unwrap_or_default(),
-            screen_height: Length::from_nautical_miles(twr_cfg.default_zoom_range.into()),
+            screen_height: Length::from_feet(f64::from(twr_cfg.default_zoom_range) * 200_f64),
             rotation: Angle::from_degrees(twr_cfg.default_rotation.into()),
             display_items: vec![AtcDisplayItem::Map {id: twr_cfg.video_map_id.to_string(), visible: true}]
         }
@@ -280,7 +280,7 @@ impl AtcDisplay {
                 name: "STARS".to_string(),
                 display_type: "stars".to_string(),
                 center: area.visibility_center,
-                screen_height: Length::from_nautical_miles(area.surveillance_range.into()),
+                screen_height: Length::from_nautical_miles(f64::from(area.surveillance_range) * 2_f64),
                 rotation: Angle::from_radians(0_f64),
                 display_items: display_items.0
             },
@@ -288,7 +288,7 @@ impl AtcDisplay {
                 name: "STARS (Top Down Mode)".to_string(),
                 display_type: "stars".to_string(),
                 center: area.visibility_center,
-                screen_height: Length::from_nautical_miles(area.surveillance_range.into()),
+                screen_height: Length::from_nautical_miles(f64::from(area.surveillance_range) * 2_f64),
                 rotation: Angle::from_radians(0_f64),
                 display_items: display_items.1
             }
@@ -304,7 +304,7 @@ impl AtcDisplay {
                 name: format!("ERAM {}", geo_map.name),
                 display_type: "eram".to_string(),
                 center: GeoPoint::default(),
-                screen_height: Length::from_nautical_miles(150_f64),
+                screen_height: Length::from_nautical_miles(600_f64),
                 rotation: Angle::from_radians(0_f64),
                 display_items: display_items.0
             });
@@ -312,7 +312,7 @@ impl AtcDisplay {
                 name: format!("ERAM {} (Top Down Mode)", geo_map.name),
                 display_type: "eram".to_string(),
                 center: GeoPoint::default(),
-                screen_height: Length::from_nautical_miles(150_f64),
+                screen_height: Length::from_nautical_miles(600_f64),
                 rotation: Angle::from_radians(0_f64),
                 display_items: display_items.1
             });
