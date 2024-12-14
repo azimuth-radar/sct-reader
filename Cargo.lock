@@ -46,9 +46,9 @@ checksum = "ace50bade8e6234aa140d9a2f552bbee1db4d353f69b8217bc503490fc1a9f26"
 
 [[package]]
 name = "aviation_calc_util"
-version = "2.13.1"
+version = "2.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "91f87d35f2da0b4e6fbfede68cf8c0267d1526c2c32abe1098ad70c40dba7f1c"
+checksum = "087ee19c237b921c43f2d05cbd4930f8dadb9c5bb043e0dcc09df06431c632d7"
 dependencies = [
  "anyhow",
  "chrono",

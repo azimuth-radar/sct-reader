@@ -30,7 +30,7 @@ fn test_convert_es_path_2(){
 #[test]
 #[ignore]
 fn test_load_es_1(){
-    let prf_path = r#"/Users/pshivaraman/Documents/EuroScope/UK/Belfast/Belfast Combined.prf"#;
+    let prf_path = r#"C:\Users\prith\Documents\EuroScope\UK\Belfast\Belfast Combined.prf"#;
     let mut es = EuroScopeLoader {
         prfs: vec![EuroScopeLoaderPrf::try_new_from_prf(prf_path).unwrap()]
     };
@@ -38,7 +38,7 @@ fn test_load_es_1(){
 
     let package = AtcScopePackage::try_from(result).unwrap();
 
-    serde_json::to_writer(BufWriter::new(File::create(Path::new("target").join("test_es_out.json")).unwrap()), &package);
+    serde_json::to_writer(BufWriter::new(File::create(Path::new("target").join("test_es_out_poly.json")).unwrap()), &package);
 
     //let a = package.maps.get("/Users/pshivaraman/Documents/EuroScope/UK/Belfast/Sector/Belfast.sct_regions_Belfast City");
     //println!("{:#?}", es);
@@ -60,12 +60,12 @@ fn test_load_es_2(){
 #[test]
 #[ignore]
 fn test_load_crc_1() {
-    let crc_path = r#"C:\Programs\CRC\ARTCCs\ZNY.json"#;
+    let crc_path = r#"C:\Programs\CRC\ARTCCs\ZLA.json"#;
     let crc_package = CrcPackage::try_new_from_file(crc_path).unwrap();
 
     let package = AtcScopePackage::try_from(&crc_package).unwrap();
 
-    serde_json::to_writer(BufWriter::new(File::create(Path::new("target").join("test_crc_out.json")).unwrap()), &package);
+    serde_json::to_writer(BufWriter::new(File::create(Path::new("target").join("test_crc_out_zla.json")).unwrap()), &package);
 
     //println!("{:#?}", package);
 }
