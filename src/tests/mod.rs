@@ -47,14 +47,14 @@ fn test_load_es_1(){
 #[test]
 #[ignore]
 fn test_load_es_2(){
-    let prf_path = r#"C:\Users\prith\Documents\EuroScope\UK"#;
+    let prf_path = r#"/Users/pshivaraman/Documents/EuroScope/UK"#;
 
     let mut es = EuroScopeLoader::try_new_from_dir(prf_path).unwrap();
     let result = es.try_read().unwrap();
 
     let package = AtcScopePackage::try_from(result).unwrap();
 
-    serde_json::to_writer(BufWriter::new(File::create(Path::new("target").join("test_es_all_out.json")).unwrap()), &package);
+    serde_json::to_writer(BufWriter::new(File::create(Path::new("target").join("test_es_all_out.atcjson")).unwrap()), &package);
 }
 
 #[test]

@@ -106,9 +106,9 @@ impl SymbolIcon {
             let split = line.split(" ").collect::<Vec<&str>>();
             if split.len() > 0 {
                 match split[0] {
-                    "MOVETO" => cursor_pos = (split[1].parse()?, split[2].parse()?),
+                    "MOVETO" => cursor_pos = (split[1].parse()?, -split[2].parse()?),
                     "LINETO" => {
-                        let end_point = (split[1].parse()?, split[2].parse()?);
+                        let end_point = (split[1].parse()?, -split[2].parse::<i8>()?);
                         draw_items.push(SymbolDrawItem::Line {
                             start: cursor_pos,
                             end: end_point,
@@ -116,7 +116,7 @@ impl SymbolIcon {
                         cursor_pos = end_point;
                     }
                     "SETPIXEL" => {
-                        let point = (split[1].parse()?, split[2].parse()?);
+                        let point = (split[1].parse()?, -split[2].parse::<i8>()?);
                         draw_items.push(SymbolDrawItem::SetPixel(point));
                         cursor_pos = point;
                     }
@@ -124,7 +124,7 @@ impl SymbolIcon {
                         let mut i = 1;
                         let mut points = Vec::new();
                         while i < split.len() - 1 {
-                            let point = (split[i].parse::<i8>()?, split[i + 1].parse::<i8>()?);
+                            let point = (split[i].parse::<i8>()?, -split[i + 1].parse::<i8>()?);
                             cursor_pos = point;
                             points.push(point);
                             i += 2;
@@ -133,7 +133,7 @@ impl SymbolIcon {
                     }
                     "ARC" => {
                         draw_items.push(SymbolDrawItem::Arc {
-                            center: (split[1].parse()?, split[2].parse()?),
+                            center: (split[1].parse()?, -split[2].parse()?),
                             radius: split[3].parse()?,
                             inner_radius: 0,
                             start_angle: split[4].parse()?,
@@ -143,7 +143,7 @@ impl SymbolIcon {
                     }
                     "FILLARC" => {
                         draw_items.push(SymbolDrawItem::Arc {
-                            center: (split[1].parse()?, split[2].parse()?),
+                            center: (split[1].parse()?, -split[2].parse()?),
                             radius: split[3].parse()?,
                             inner_radius: 0,
                             start_angle: split[4].parse()?,

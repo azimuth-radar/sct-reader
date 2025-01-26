@@ -1,6 +1,6 @@
 [package]
 name = "sct-reader"
-version = "0.4.0"
+version = "0.4.1"
 edition = "2021"
 authors = ["Caspian Merlin <chpmerlin@gmail.com>", "Prithvi Shivaraman <git.prithvi@slogin.shivaraman.net"]
 description = "A Rust crate for deserialising sector files used by online ATC clients such as EuroScope and VRC and converting them to a common format"
