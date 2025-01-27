@@ -16,9 +16,15 @@ use std::io::BufReader;
 use std::path::Path;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum AtcMapData {
+    Embedded {features: FeatureCollection},
+    ExternalFile {filename: String}
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AtcMap {
     pub name: String,
-    pub features: FeatureCollection,
+    pub data: AtcMapData
 }
 
 impl AtcMap {
@@ -50,11 +56,13 @@ impl AtcMap {
 
         Ok(AtcMap {
             name: name,
-            features: FeatureCollection {
-                bbox: None,
-                features: features,
-                foreign_members: None,
-            },
+            data: AtcMapData::Embedded { 
+                features: FeatureCollection {
+                    bbox: None,
+                    features: features,
+                    foreign_members: None,
+                }
+            }
         })
     }
 
@@ -86,11 +94,13 @@ impl AtcMap {
 
         Ok(AtcMap {
             name: name,
-            features: FeatureCollection {
-                bbox: None,
-                features: features,
-                foreign_members: None,
-            },
+            data: AtcMapData::Embedded { 
+                features: FeatureCollection {
+                    bbox: None,
+                    features: features,
+                    foreign_members: None,
+                }
+            }
         })
     }
 
@@ -119,11 +129,13 @@ impl AtcMap {
 
         Ok(AtcMap {
             name: name,
-            features: FeatureCollection {
-                bbox: None,
-                features: features,
-                foreign_members: None,
-            },
+            data: AtcMapData::Embedded { 
+                features: FeatureCollection {
+                    bbox: None,
+                    features: features,
+                    foreign_members: None,
+                }
+            }
         })
     }
 
@@ -148,11 +160,13 @@ impl AtcMap {
 
         Ok(AtcMap {
             name: name,
-            features: FeatureCollection {
-                bbox: None,
-                features: features,
-                foreign_members: None,
-            },
+            data: AtcMapData::Embedded { 
+                features: FeatureCollection {
+                    bbox: None,
+                    features: features,
+                    foreign_members: None,
+                }
+            }
         })
     }
 
@@ -346,11 +360,13 @@ impl AtcMap {
 
             return Ok(AtcMap {
                 name: map_ref.name.to_string(),
-                features: FeatureCollection {
-                    bbox: None,
-                    features: new_features,
-                    foreign_members: None,
-                },
+                data: AtcMapData::Embedded { 
+                    features: FeatureCollection {
+                        bbox: None,
+                        features: new_features,
+                        foreign_members: None,
+                    }
+                }
             });
         }
 

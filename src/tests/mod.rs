@@ -54,7 +54,9 @@ fn test_load_es_2(){
 
     let package = AtcScopePackage::try_from(result).unwrap();
 
-    serde_json::to_writer(BufWriter::new(File::create(Path::new("target").join("test_es_all_out.atcjson")).unwrap()), &package);
+    package.export_to_gzip("target", "test_es_all_out".to_string()).unwrap();
+
+    serde_json::to_writer(BufWriter::new(File::create(Path::new("target").join("test_es_all_out.json")).unwrap()), &package);
 }
 
 #[test]

@@ -1,6 +1,6 @@
 [package]
 name = "sct-reader"
-version = "0.4.1"
+version = "0.5.0"
 edition = "2021"
 authors = ["Caspian Merlin <chpmerlin@gmail.com>", "Prithvi Shivaraman <git.prithvi@slogin.shivaraman.net"]
 description = "A Rust crate for deserialising sector files used by online ATC clients such as EuroScope and VRC and converting them to a common format"
@@ -13,9 +13,12 @@ categories = ["parsing"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1.0.94"
+anyhow = "1.0.95"
 aviation_calc_util = "2.13.2"
-directories = "5.0.1"
+directories = "6.0.0"
+flate2 = "1.0.35"
 geojson = "0.24.1"
-serde = {version = "1.0.215", features = ["derive"]}
-serde_json = "1.0.133"
+serde = {version = "1.0.217", features = ["derive"]}
+serde_json = "1.0.137"
+tar = "0.4.43"
+uuid = {version = "1.12.1", features = ["v4", "fast-rng", "macro-diagnostics"]}
